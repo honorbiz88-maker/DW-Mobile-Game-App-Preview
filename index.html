@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>DelWin Mobile: Roadside Tire Rescue</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Top Player Command Bar (Populated dynamically by game.js) -->
+    <header class="top-bar"></header>
+
+    <!-- Slide-Out Menu Drawer -->
+    <div id="drawer-backdrop" class="drawer-backdrop hidden" onclick="toggleDrawer(false)"></div>
+    <aside id="menu-drawer" class="menu-drawer hidden">
+      <div class="drawer-header">
+        <strong>DELWIN MOBILE<br><span style="font-size:10px;color:var(--amber);font-weight:700;">ROADSIDE TIRE RESCUE</span></strong>
+        <button class="icon-btn" onclick="toggleDrawer(false)">✕</button>
+      </div>
+
+      <div class="drawer-stats">
+        <div class="stat-row"><span>Gold Gears:</span><strong id="drawer-parts">0 ⚙️</strong></div>
+        <div class="stat-row"><span>Customer Rating:</span><strong id="drawer-rating">5.0 ★ (+15%)</strong></div>
+        <div class="stat-row"><span>Active Corridor:</span><strong id="drawer-zone">I-285 North Perimeter</strong></div>
+      </div>
+
+      <section id="cloud-account-card" style="background:#090c12;border:1px solid var(--border);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:7px;">
+        <div style="font-size:12px;font-weight:900;color:var(--amber);">CLOUD CAREER SAVE</div>
+        <div id="cloud-account-status" role="status" style="font-size:11px;color:var(--muted);">Connecting account services…</div>
+        <div id="cloud-signed-out">
+          <input id="cloud-email" type="email" autocomplete="email" placeholder="Email address" style="box-sizing:border-box;width:100%;padding:9px;border-radius:7px;border:1px solid var(--border);background:#111827;color:var(--text);font-size:12px;" />
+          <input id="cloud-password" type="password" autocomplete="current-password" placeholder="Password (6+ characters)" style="box-sizing:border-box;width:100%;padding:9px;border-radius:7px;border:1px solid var(--border);background:#111827;color:var(--text);font-size:12px;margin-top:6px;" />
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;">
+            <button id="cloud-create" type="button" class="primary-btn" style="font-size:11px;padding:9px;">CREATE ACCOUNT</button>
+            <button id="cloud-signin" type="button" class="secondary-btn" style="font-size:11px;padding:9px;">SIGN IN</button>
+          </div>
+          <button id="cloud-reset" type="button" class="ghost-btn" style="font-size:11px;">Forgot password?</button>
+        </div>
+        <div id="cloud-signed-in" hidden>
+          <div id="cloud-user-email" style="font-size:11px;overflow-wrap:anywhere;"></div>
+          <button id="cloud-signout" type="button" class="secondary-btn" style="font-size:11px;padding:9px;">SIGN OUT</button>
+        </div>
+      </section>
+
+      <nav class="drawer-nav">
+        <button onclick="toggleDrawer(false); goPage('dispatch');">🚨 Live Dispatch Board</button>
+        <button onclick="toggleDrawer(false); goPage('bay');">🔧 Active Repair Bay</button>
+        <button onclick="toggleDrawer(false); goPage('garage');">🚛 Fleet Rig & Tools</button>
+        <button onclick="toggleDrawer(false); goPage('zones');">🗺️ 24 Corridor Zones</button>
+        <button onclick="toggleDrawer(false); goPage('league');">🏆 Division Leaderboard</button>
+        <button onclick="toggleDrawer(false); goPage('shop');">⚡ Dispatch Supply Shop</button>
+        <button onclick="toggleDrawer(false); startTutorial();">🎓 Replay Training Call</button>
+        <button id="sound-toggle-btn" onclick="toggleSound()">🔊 Mechanical Audio: ON</button>
+        <button class="danger-btn" onclick="resetSave()">🗑️ Reset Career Save</button>
+      </nav>
+    </aside>
+
+    <!-- PAGE 1: LIVE DISPATCH -->
+    <main id="page-dispatch" class="page active">
+      <div class="zone-banner">
+        <div>
+          <span class="badge">ACTIVE CORRIDOR</span>
+          <div id="dispatch-zone-label" style="font-size:13px;font-weight:900;margin-top:3px;">I-285 NORTH PERIMETER (1x)</div>
+        </div>
+        <button class="surge-btn" onclick="triggerSurgeAction()">
+          <span id="dispatch-boost-label">2X SURGE (0/3)</span>
+        </button>
+      </div>
+
+      <div id="job-list" class="stack-list"></div>
+    </main>
+
+    <!-- PAGE 2: REPAIR BAY -->
+    <main id="page-bay" class="page">
+      <div id="bay-empty" class="item-card" style="text-align:center;padding:28px 16px;">
+        <span class="badge">BAY STANDBY</span>
+        <h3 style="margin:8px 0;">No Active Roadside Call</h3>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:14px;">Accept a stranded motorist or commercial freight call from the Dispatch Board.</p>
+        <button class="primary-btn" onclick="goPage('dispatch')">OPEN DISPATCH BOARD</button>
+      </div>
+
+      <div id="bay-active" class="hidden">
+        <div class="bay-top-card">
+          <div>
+            <span id="bay-veh-tag" class="badge">COMMUTER SEDAN</span>
+            <h3 id="bay-job-title" style="font-size:14px;margin-top:4px;">I-285 Mile 14</h3>
+          </div>
+          <div id="bay-payout" class="bay-pay-col">$75</div>
+        </div>
+
+        <!-- 5-Step Progress Bar -->
+        <div class="step-pills">
+          <div id="sp-1" class="sp">1. LIFT</div>
+          <div id="sp-2" class="sp">2. LUGS</div>
+          <div id="sp-3" class="sp">3. TIRE</div>
+          <div id="sp-4" class="sp">4. PSI</div>
+          <div id="sp-5" class="sp">5. TORQUE</div>
+        </div>
+
+        <!-- Interactive Highway Stage -->
+        <div id="bay-stage" class="bay-stage">
+          <div id="weather-layer" class="weather-layer"></div>
+          <div id="night-shade" class="night-shade hidden"></div>
+
+          <div class="stage-hud-strip">
+            <span id="stage-cond-pill" class="cond-pill clear">☀️ CLEAR DAY</span>
+            <button id="stage-flood-btn" class="flood-btn" onclick="toggleBayFloodlights()">🔦 FLOODLIGHTS: OFF</button>
+          </div>
+
+          <div id="scan-beam" class="scan-beam hidden"></div>
+
+          <!-- Vehicle Chassis -->
+          <div id="stage-chassis" class="stage-chassis">
+            <img id="stage-veh-img" src="" alt="" style="display:none;" />
+            <div id="stage-veh-fallback"></div>
+          </div>
+
+          <!-- Wheel & Lug Hub -->
+          <div id="stage-wheel-wrap" class="stage-wheel-wrap">
+            <img id="stage-tire-img" src="" alt="" style="display:none;" />
+            <div id="stage-tire-fallback"></div>
+            <svg id="star-lines-svg" viewBox="0 0 120 120" class="star-lines-svg"></svg>
+            <div id="lug-ring" class="lug-ring"></div>
+          </div>
+
+          <!-- Hydraulic Floor Jack -->
+          <div id="stage-jack" class="stage-jack">
+            <div id="jack-arm" class="jack-arm"></div>
+            <div class="jack-base"></div>
+          </div>
+
+          <!-- Rubber Wheel Chock -->
+          <div id="stage-chock" class="stage-chock"></div>
+          <div class="road-shoulder"></div>
+        </div>
+
+        <!-- Diagnostic / Safety Alert Banner -->
+        <div id="diag-alert" class="diag-alert hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <strong id="diag-alert-title">ALERT</strong>
+            <button class="ghost-btn" style="padding:2px 7px;font-size:11px;" onclick="dismissAlert()">✕</button>
+          </div>
+          <p id="diag-alert-msg"></p>
+        </div>
+
+        <!-- Step Controls Container -->
+        <div id="bay-controls" class="item-card bay-controls"></div>
+      </div>
+    </main>
+
+    <!-- PAGE 3: GARAGE -->
+    <main id="page-garage" class="page">
+      <div id="tool-list" class="stack-list"></div>
+    </main>
+
+    <!-- PAGE 4: 24 ZONES -->
+    <main id="page-zones" class="page">
+      <div id="zone-list" class="stack-list"></div>
+    </main>
+
+    <!-- PAGE 5: DIVISION LEADERBOARD -->
+    <main id="page-league" class="page">
+      <div class="item-card" style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <span class="badge">CORRIDOR STANDINGS</span>
+          <div style="font-size:18px;font-weight:900;margin-top:4px;"><span id="league-rep">0</span> REP</div>
+        </div>
+        <div style="text-align:right;">
+          <span class="badge">DIVISION RANK</span>
+          <div id="league-rank" style="font-size:22px;font-weight:900;color:var(--amber);margin-top:2px;">#6</div>
+        </div>
+      </div>
+      <div id="leaderboard-list" class="stack-list"></div>
+    </main>
+
+    <!-- PAGE 6: SUPPLY & TOKEN SHOP (Populated dynamically by game.js) -->
+    <main id="page-shop" class="page">
+      <div id="shop-dynamic-root" class="stack-list"></div>
+    </main>
+
+    <!-- Bottom Navigation (Clean 5-Tab Bar) -->
+    <nav class="bottom-nav">
+      <button id="nav-dispatch" class="nav-btn active" onclick="goPage('dispatch')">🚨<span>Dispatch</span></button>
+      <button id="nav-bay" class="nav-btn" onclick="goPage('bay')">🔧<span>Repair Bay</span></button>
+      <button id="nav-garage" class="nav-btn" onclick="goPage('garage')">🚛<span>Garage</span></button>
+      <button id="nav-zones" class="nav-btn" onclick="goPage('zones')">🗺️<span>Zones</span></button>
+      <button id="nav-league" class="nav-btn" onclick="goPage('league')">🏆<span>League</span></button>
+    </nav>
+
+    <!-- Modal Overlay -->
+    <div id="modal-overlay" class="modal-overlay hidden">
+      <div id="modal-card" class="modal-card"></div>
+    </div>
+  </div>
+
+  <script type="module" src="firebase-cloud.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
