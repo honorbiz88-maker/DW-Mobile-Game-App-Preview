@@ -2391,6 +2391,8 @@ function lockPsi() {
 function completeJob() {
   const job = state.activeJob;
   if (!job) return;
+  // Keep the completion handler from bypassing the final safety/repair stages.
+  if (!job.isTutorial && (job.step !== 5 || job.torqueIdx !== 5 || !job.fixed || !job.jackLowered)) return;
   stopHoldPsi();
   state.activeJob = null;
   SoundFX.success();
