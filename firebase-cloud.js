@@ -387,9 +387,10 @@ function queueSave(payload) {
   syncTimer = setTimeout(() => flushPendingSave(queuedUid), 1400);
 }
 function isRestorePending() {
-  if (!currentUser) return false;
   try {
     const marker = JSON.parse(localStorage.getItem(RESTORE_MARKER_KEY) || "null");
+    // game.js boots before Firebase finishes restoring auth. The durable marker
+    // must still block startup writes during that unauthenticated interval.
     return !!marker?.uid && (!currentUser || marker.uid === currentUser.uid);
   } catch {
     return false;
