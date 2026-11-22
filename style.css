@@ -866,3 +866,17 @@ button, .lug-btn, .hud-pill-compact {
 @media (prefers-reduced-motion:reduce) {
   *,*::before,*::after { animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important; }
 }
+
+
+/* Dispatch fleet artwork — distinct vehicle silhouettes */
+.dispatch-vehicle-art{position:relative;display:flex;align-items:center;justify-content:center;min-height:104px;margin:8px 0 5px;padding:5px 12px 2px;overflow:hidden;border:1px solid rgba(148,163,184,.14);border-radius:13px;background:linear-gradient(180deg,rgba(15,30,48,.8),rgba(4,10,19,.92)),url('assets/roadside-atmosphere.svg') center 58%/cover}
+.dispatch-vehicle-art:after{content:"";position:absolute;inset:auto 8% 8px;height:1px;background:linear-gradient(90deg,transparent,rgba(245,158,11,.7),transparent)}
+.vehicle-art{position:relative;z-index:1;width:min(100%,310px);height:100px;filter:drop-shadow(0 7px 8px rgba(0,0,0,.42));overflow:visible}
+.vehicle-class-tag{position:absolute;right:9px;top:8px;z-index:2;font-size:8px;letter-spacing:1.1px;font-weight:900;color:#fbbf24;opacity:.88}
+.job-card{overflow:hidden}
+.job-card .job-top{align-items:flex-start;gap:8px}
+.job-card .job-pay{white-space:nowrap}
+.rig-hero{position:relative;overflow:hidden}
+.rig-hero:before{content:"";position:absolute;right:10px;top:10px;width:42px;height:42px;background:url('assets/delwin-emblem.svg') center/contain no-repeat;opacity:.78;pointer-events:none}
+.rig-hero-top{padding-right:42px}
+@media(max-width:380px){.dispatch-vehicle-art{min-height:88px}.vehicle-art{height:86px}.vehicle-class-tag{font-size:7px}}
