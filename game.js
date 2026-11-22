@@ -1106,7 +1106,6 @@ function renderRatingPerkBanner() {
 
 function updateHUD() {
   syncSurgeRecharge();
-  syncTokenDropRecharge();
   renderTopHeader();
   const drawerParts = document.getElementById('drawer-parts');
   if (drawerParts) drawerParts.textContent = `${state.parts} ⚙️`;
