@@ -854,12 +854,16 @@ function renderToolSVG(key, tier) {
 }
 
 function renderVehicleSVG(veh) {
-  return `
-    <svg viewBox="0 0 280 90" width="275" height="90">
-      <path d="M24 68 L24 44 L66 40 L98 18 L194 18 L224 40 L256 46 L256 68 Z" fill="${veh.bodyColor}" stroke="#94a3b8" stroke-width="2"/>
-      <polygon points="102,23 188,23 210,39 82,39" fill="#0f172a" opacity="0.85"/>
-      <path d="M104 68 A36 36 0 0 1 176 68 Z" fill="#090c12" stroke="#f59e0b" stroke-width="2.2"/>
-    </svg>`;
+  const color = veh.bodyColor || '#64748b';
+  const glass = '#10243a';
+  const wheel = (x) => `<g><circle cx="${x}" cy="103" r="19" fill="#080d14" stroke="#64748b" stroke-width="4"/><circle cx="${x}" cy="103" r="8" fill="#cbd5e1" stroke="#475569" stroke-width="3"/><circle cx="${x}" cy="103" r="2.5" fill="#f59e0b"/></g>`;
+  let body = '';
+  if (veh.id === 'sedan') body = `<path d="M22 91 L27 68 Q31 59 55 56 L91 31 Q101 23 119 23 H190 Q204 24 218 45 L245 59 Q257 63 261 77 L260 91Z" fill="${color}" stroke="#cbd5e1" stroke-width="2.5"/><path d="M99 31 H133 V55 H70Z M141 31 H187 Q197 33 210 55 H141Z" fill="${glass}" stroke="#94a3b8" stroke-width="1.5"/>`;
+  else if (veh.id === 'suv') body = `<path d="M20 91 L25 62 Q30 54 57 52 L78 29 Q85 22 103 22 H194 Q210 24 221 48 L249 57 Q260 62 263 77 L261 91Z" fill="${color}" stroke="#cbd5e1" stroke-width="2.5"/><path d="M87 29 H132 V52 H67Z M141 29 H190 Q201 31 214 52 H141Z" fill="${glass}" stroke="#94a3b8" stroke-width="1.5"/><path d="M137 27 V89" stroke="#334155" stroke-width="2"/>`;
+  else if (veh.id === 'pickup') body = `<path d="M18 91 L24 62 Q30 54 62 52 L82 28 Q89 22 108 22 H157 V55 H206 L238 63 Q257 66 262 79 L260 91Z" fill="${color}" stroke="#cbd5e1" stroke-width="2.5"/><path d="M91 29 H151 V53 H69Z" fill="${glass}" stroke="#94a3b8" stroke-width="1.5"/><path d="M164 59 H225 L239 76 H164Z" fill="#111827" stroke="#94a3b8" stroke-width="1.5"/><path d="M165 57 V87" stroke="#f8fafc" opacity=".5" stroke-width="2"/>`;
+  else if (veh.id === 'boxtruck') body = `<path d="M20 91 V45 Q20 37 30 37 H183 V91Z" fill="${color}" stroke="#cbd5e1" stroke-width="2.5"/><path d="M183 91 V56 Q183 48 194 48 H228 L256 70 V91Z" fill="#64748b" stroke="#cbd5e1" stroke-width="2.5"/><path d="M198 54 H225 L246 72 H198Z" fill="${glass}" stroke="#94a3b8" stroke-width="1.5"/><path d="M35 48 H168 V81 H35Z" fill="none" stroke="#e2e8f0" opacity=".28" stroke-width="2"/>`;
+  else body = `<path d="M15 91 V51 Q15 43 27 43 H112 V91Z" fill="${color}" stroke="#cbd5e1" stroke-width="2.5"/><path d="M112 91 V62 Q112 52 124 52 H168 L190 72 V91Z" fill="#475569" stroke="#cbd5e1" stroke-width="2.5"/><path d="M126 57 H163 L180 73 H126Z" fill="${glass}" stroke="#94a3b8" stroke-width="1.5"/><path d="M192 76 H264 V91 H192Z" fill="#334155" stroke="#94a3b8" stroke-width="2"/><path d="M203 76 V91 M228 76 V91 M252 76 V91" stroke="#94a3b8" stroke-width="2"/>`;
+  return `<svg class="vehicle-art vehicle-${veh.id}" viewBox="0 0 280 125" role="img" aria-label="${veh.label}" xmlns="http://www.w3.org/2000/svg"><ellipse cx="142" cy="111" rx="124" ry="7" fill="#020617" opacity=".65"/>${body}<path d="M25 80 H255" stroke="#f8fafc" stroke-width="2" opacity=".22"/><path d="M26 85 H40 M244 85 H258" stroke="#fbbf24" stroke-width="4" stroke-linecap="round"/>${wheel(76)}${wheel(220)}<path d="M18 93 H263" stroke="#0f172a" stroke-width="3"/></svg>`;
 }
 
 function renderTireSVG(job, size = 130) {
@@ -1230,6 +1234,7 @@ function renderJobs() {
           </div>
           <div class="job-pay">$${j.pay}${state.surgeJobs > 0 ? ' (2x)' : ''}</div>
         </div>
+        <div class="dispatch-vehicle-art">${renderVehicleSVG(j.veh)}<span class="vehicle-class-tag">${j.veh.heavy ? 'HEAVY-DUTY FLEET' : 'ROAD SERVICE'}</span></div>
         <div class="job-meta">
           <span>${j.veh.heavy ? '🛞 HD Tire' : '🛞 Std Tire'} · ${j.veh.targetPsi} PSI${hazardBadge}${lockBadge}</span>
           <span>⭐ +${j.baseRep || 30} REP · ⏱️ SLA: ${j.timeLimit}s</span>
