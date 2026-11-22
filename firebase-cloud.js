@@ -191,7 +191,7 @@ async function keepLocal() {
   const pending = window.DelWinCloud.pendingConflict;
   if (!pending || !currentUser || pending.uid !== currentUser.uid) return;
   try {
-    localStorage.setItem(`delwin_cloud_backup_${currentUser.uid}`, JSON.stringify(pending.cloudData));
+    localStorage.setItem(`delwin_cloud_backup_${currentUser.uid}_${Date.now()}`, JSON.stringify(pending.cloudData));
     await writeCloud(JSON.parse(pending.localRaw), pending.uid);
     if (!currentUser || currentUser.uid !== pending.uid) return;
     syncReady = true;
