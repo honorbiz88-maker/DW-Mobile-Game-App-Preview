@@ -266,7 +266,7 @@ function loadState() {
     state.rigCondition = Math.max(0, Math.min(100, state.rigCondition));
     if (!Number.isFinite(state.contractsCompleted)) state.contractsCompleted = 0;
     // Mark already-reached milestones as claimed in legacy saves to prevent duplicate grants.
-    if (!Array.isArray(state.claimedCareerGearMilestones)) state.claimedCareerGearMilestones = [10,30,60,100,175,275].filter((m) => (state.jobsCompleted || 0) >= m);
+    if (!Array.isArray(state.claimedCareerGearMilestones) || (state.claimedCareerGearMilestones.length === 0 && (state.jobsCompleted || 0) > 0)) state.claimedCareerGearMilestones = [10,30,60,100,175,275].filter((m) => (state.jobsCompleted || 0) >= m);
     if (!Array.isArray(state.jobs)) state.jobs = [];
     state.jobs = state.jobs.filter((j) => j && j.veh && typeof j.veh === 'object' && j.dmg && typeof j.dmg === 'object');
     if (state.activeJob && (!state.activeJob.veh || typeof state.activeJob.veh !== 'object' || !state.activeJob.dmg || typeof state.activeJob.dmg !== 'object')) {
