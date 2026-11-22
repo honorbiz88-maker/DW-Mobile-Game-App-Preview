@@ -2255,6 +2255,14 @@ function renderGarage() {
   const isUnlocked = previewRigTier <= (state.unlockedRigTier || 1);
   const meetsTools = getMinToolLevel() >= rig.reqLvl;
   const currentHub = getCurrentHubTier();
+  const activeRig = RIG_TIERS[activeRigTier - 1];
+  const payoutDelta = rig.mult - activeRig.mult;
+  const cargoDelta = (rig.capStd + rig.capHd + rig.capPlugs) - (activeRig.capStd + activeRig.capHd + activeRig.capPlugs);
+  const rigStatusLine = isUnlocked
+    ? 'This rig is already in your commissioned fleet.'
+    : previewRigTier === (state.unlockedRigTier + 1)
+      ? 'Next available fleet commission.'
+      : `Unlock Tier ${state.unlockedRigTier + 1} first to continue your fleet progression.`;
 
   const garagePage = document.getElementById('page-garage');
   let heroCard = garagePage.querySelector('.rig-hero');
@@ -2282,6 +2290,11 @@ function renderGarage() {
       <img src="${rig.img}" alt="" style="display:none;" onload="this.style.display='block';" onerror="this.style.display='none';" />
     </div>
     <p id="rig-perk" style="font-size:12px;color:var(--muted);">${rig.perk} (${rig.req})</p>
+    <div class="rig-upgrade-intel">
+      <div class="rig-upgrade-stat"><span>PAYOUT MULTIPLIER</span><strong>${rig.mult.toFixed(2)}x</strong><small>${payoutDelta > 0 ? '+' : ''}${payoutDelta.toFixed(2)}x vs active rig</small></div>
+      <div class="rig-upgrade-stat"><span>CARGO CAPACITY</span><strong>${rig.capStd + rig.capHd + rig.capPlugs}</strong><small>${cargoDelta > 0 ? '+' : ''}${cargoDelta} total slots vs active</small></div>
+    </div>
+    <div class="rig-upgrade-status">${rigStatusLine}</div>
     <div style="font-size:11px;color:var(--amber);font-weight:800;">
       Hub ${currentHub.hubNum} (${currentHub.name}) → Tool Tier ${currentHub.toolTier} (${currentHub.levels}) · Cargo: ${rig.capStd} Std / ${rig.capHd} HD / ${rig.capPlugs} Plugs
     </div>
