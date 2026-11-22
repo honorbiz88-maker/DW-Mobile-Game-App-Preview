@@ -146,6 +146,9 @@ async function reconcile(user) {
   try {
     const ref = doc(db, "users", user.uid, "saves", "current");
     const snap = await getDoc(ref);
+    // Authentication may have changed while Firestore was responding. A stale
+    // reconciliation must never restore one account's save over another's local career.
+    if (!currentUser || currentUser.uid !== user.uid) return;
     const local = localSnapshot();
     if (local?.invalid) return;
     if (!snap.exists()) {
@@ -288,6 +291,13 @@ accountCard();
   });
 })();
 onAuthStateChanged(auth, user => {
+    const previousUid = currentUser?.uid || null;
+    const nextUid = user?.uid || null;
+    if (previousUid !== nextUid) {
+      clearTimeout(syncTimer);
+      syncTimer = null;
+      pendingPayload = null;
+    }
     currentUser = user;
     syncReady = false;
     const signedOut = document.getElementById("cloud-signed-out");
