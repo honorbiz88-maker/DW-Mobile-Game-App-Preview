@@ -2366,7 +2366,8 @@ function purchaseRigTier(tierNum) {
 }
 
 function serviceActiveRig() {
-  const condition = Math.max(0, Math.min(100, Number(state.rigCondition) || 100));
+  const savedCondition = Number.isFinite(state.rigCondition) ? state.rigCondition : 100;
+  const condition = Math.max(0, Math.min(100, savedCondition));
   if (condition >= 100) {
     showAlert('FLEET READY', 'Your active rig is already at full condition.');
     return;
