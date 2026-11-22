@@ -25,23 +25,9 @@
         <div class="stat-row"><span>Active Corridor:</span><strong id="drawer-zone">I-285 North Perimeter</strong></div>
       </div>
 
-      <section id="cloud-account-card" style="background:#090c12;border:1px solid var(--border);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:7px;">
-        <div style="font-size:12px;font-weight:900;color:var(--amber);">CLOUD CAREER SAVE</div>
-        <div id="cloud-account-status" role="status" style="font-size:11px;color:var(--muted);">Connecting account services…</div>
-        <button id="cloud-auth-diagnostic" type="button" class="ghost-btn" style="font-size:10px;padding:7px;margin-top:4px;">RUN AUTH CONNECTION CHECK</button>
-        <div id="cloud-signed-out">
-          <input id="cloud-email" type="email" autocomplete="email" placeholder="Email address" style="box-sizing:border-box;width:100%;padding:9px;border-radius:7px;border:1px solid var(--border);background:#111827;color:var(--text);font-size:12px;" />
-          <input id="cloud-password" type="password" autocomplete="current-password" placeholder="Password (6+ characters)" style="box-sizing:border-box;width:100%;padding:9px;border-radius:7px;border:1px solid var(--border);background:#111827;color:var(--text);font-size:12px;margin-top:6px;" />
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px;">
-            <button id="cloud-create" type="button" class="primary-btn" style="font-size:11px;padding:9px;">CREATE ACCOUNT</button>
-            <button id="cloud-signin" type="button" class="secondary-btn" style="font-size:11px;padding:9px;">SIGN IN</button>
-          </div>
-          <button id="cloud-reset" type="button" class="ghost-btn" style="font-size:11px;">Forgot password?</button>
-        </div>
-        <div id="cloud-signed-in" hidden>
-          <div id="cloud-user-email" style="font-size:11px;overflow-wrap:anywhere;"></div>
-          <button id="cloud-signout" type="button" class="secondary-btn" style="font-size:11px;padding:9px;">SIGN OUT</button>
-        </div>
+      <section id="local-save-card" style="background:#090c12;border:1px solid var(--border);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px;">
+        <div style="font-size:12px;font-weight:900;color:var(--amber);">CAREER SAVE · THIS DEVICE</div>
+        <div role="status" style="font-size:11px;color:var(--muted);">Your progress and game economy save automatically in this browser. No account or sign-up is required. Keep using this same browser on this device to continue your career.</div>
       </section>
 
       <nav class="drawer-nav">
@@ -195,7 +181,6 @@
     </div>
   </div>
 
-  <script type="module" src="firebase-cloud.js"></script>
   <script src="game.js"></script>
 </body>
 </html>
