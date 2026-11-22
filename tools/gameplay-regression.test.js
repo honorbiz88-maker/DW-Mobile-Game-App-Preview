@@ -778,3 +778,83 @@ test('rusted lug health requires repeated impact power before removal', () => {
   assert.equal(job.lugHealth[1], 0);
   assert.deepEqual(job.lugsRemoved, [1]);
 });
+
+
+test('incorrect repair choice is penalized without consuming stock, then correct plug consumes once', () => {
+  const job={step:3,scanned:true,fixed:false,dmg:{action:'plug',title:'Center tread nail'}};
+  const state={activeJob:job,plugs:1};
+  const alerts=[];
+  let renders=0;
+  const repair=gameFunction('performRepair',{
+    state,showBayActionHint:()=>{},showAlert:title=>alerts.push(title),addBayPenalty:(j,c,r,p)=>{if(!j.penaltyLog)j.penaltyLog=[];if(j.penaltyLog.some(x=>x.reason===r))return;j.penaltyLog.push({reason:r});j.penalties=(j.penalties||0)+c;j.repPenalties=(j.repPenalties||0)+p;},
+    dismissAlert:()=>{},SoundFX:{impact:()=>{}},updateHUD:()=>{},renderBay:()=>{renders++;},
+    document:{getElementById:()=>({classList:{add:()=>{},remove:()=>{}}})},setTimeout:()=>{}
+  });
+  repair('swap');
+  assert.equal(state.plugs,1);
+  assert.equal(job.fixed,false);
+  assert.equal(job.step,3);
+  assert.equal(job.penalties,20);
+  repair('plug');
+  assert.equal(state.plugs,0);
+  assert.equal(job.fixed,true);
+  assert.equal(job.step,4);
+  repair('plug');
+  assert.equal(state.plugs,0);
+  assert.equal(renders,2);
+});
+
+test('correct repair refuses to consume inventory when stock is empty', () => {
+  const job={step:3,scanned:true,fixed:false,dmg:{action:'plug',title:'Center tread nail'}};
+  const state={activeJob:job,plugs:0};
+  const alerts=[];
+  const repair=gameFunction('performRepair',{
+    state,showBayActionHint:()=>{},showAlert:title=>alerts.push(title),addBayPenalty:()=>{},
+    dismissAlert:()=>{},SoundFX:{impact:()=>{}},updateHUD:()=>{},renderBay:()=>{},
+    document:{getElementById:()=>({classList:{add:()=>{},remove:()=>{}}})},setTimeout:()=>{}
+  });
+  repair('plug');
+  assert.equal(state.plugs,0);
+  assert.equal(job.fixed,false);
+  assert.equal(job.step,3);
+  assert.ok(alerts.some(x=>/OUT OF PLUGS/.test(x)));
+});
+
+test('emergency drone drop charges exact token cost once and respects existing tire stock', () => {
+  const job={step:3,scanned:true,fixed:false,veh:{heavy:false}};
+  const state={activeJob:job,tokens:5,stdTires:0,hdTires:0};
+  let updates=0,renders=0;
+  const alerts=[];
+  const drop=gameFunction('droneDrop',{
+    state,showAlert:title=>alerts.push(title),goPage:()=>{},SoundFX:{success:()=>{}},
+    updateHUD:()=>{updates++;},renderBay:()=>{renders++;}
+  });
+  drop();
+  assert.equal(state.tokens,2);
+  assert.equal(state.stdTires,1);
+  drop();
+  assert.equal(state.tokens,2);
+  assert.equal(state.stdTires,1);
+  assert.ok(alerts.some(x=>/NOT NEEDED/.test(x)));
+  assert.equal(updates,1);
+  assert.equal(renders,1);
+});
+
+test('over-inflation repeat taps do not stack the same safety penalty', () => {
+  const job={step:4,psi:45,veh:{targetPsi:35},penalties:0,repPenalties:0,penaltyLog:[]};
+  const state={activeJob:job};
+  const alerts=[];
+  let stops=0;
+  const apply=gameFunction('applyPsiTick',{
+    state,stopHoldPsi:()=>{stops++;},
+    addBayPenalty:(j,c,r,p)=>{if(j.penaltyLog.some(x=>x.reason===r))return;j.penalties+=c;j.repPenalties+=p;j.penaltyLog.push({reason:r});},
+    showAlert:title=>alerts.push(title),renderBay:()=>{},SoundFX:{air:()=>{}},updateLivePsiMeter:()=>{}
+  });
+  apply(1);
+  apply(1);
+  assert.equal(job.penalties,15);
+  assert.equal(job.repPenalties,8);
+  assert.equal(job.psi,47);
+  assert.ok(stops>=2);
+  assert.ok(alerts.length>=1);
+});
