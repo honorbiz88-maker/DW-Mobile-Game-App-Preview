@@ -959,7 +959,7 @@ test('new contract rolls exclude the previous contract and unavailable heavy obj
     state,CONTRACT_POOL:pool,
     isContractAvailable:c=>c.type!=='heavy',
     getZone:()=>({mult:1.25}),
-    Math:{random:()=>{randomCalls++;return 0;},floor:Math.floor,max:Math.max}
+    Math:{random:()=>{randomCalls++;return 0;},floor:Math.floor,max:Math.max,min:Math.min}
   });
   roll();
   assert.equal(state.contract.id,'c_plugs');
