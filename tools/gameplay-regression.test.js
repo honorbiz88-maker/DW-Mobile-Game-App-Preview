@@ -139,12 +139,13 @@ test('a deliberate cloud restore survives reload without reopening the same conf
   assert.match(reconcile, /localStorage\.setItem\(OWNER_KEY, user\.uid\)/);
   assert.ok(reconcile.indexOf('restoreMarker?.uid === user.uid') < reconcile.indexOf('if (local?.ownerUid && local.ownerUid !== user.uid)'),
     'An explicit cloud restore marker must be honored before the ordinary owner mismatch guard');
-  assert.match(reconcile, /queueSave\(local\.payload\)/);
+  assert.match(reconcile, /localStorage\.setItem\(LOCAL_KEY, cloudPayload\)/);
+  assert.doesNotMatch(reconcile, /queueSave\(local\.payload\)/);
   assert.match(reconcile, /JSON\.stringify\(local\.payload\) === JSON\.stringify\(cloud\.payload\)/);
   assert.match(reconcile, /reconcilingUids\.has\(user\.uid\)/);
   assert.ok(reconcile.indexOf('RESTORE_MARKER_KEY') < reconcile.indexOf('if (!local)'));
   assert.match(reconcile, /Cloud career restored and connected/);
-  assert.match(cloudSource, /restoreMarker\?\.uid === expectedUid[\s\S]*?removeItem\(RESTORE_MARKER_KEY\)/);
+  assert.match(cloudSource, /restoreMarker\?\.uid === currentUser\.uid[\s\S]*?cannot be overwritten yet/);
 });
 
 test('local career owned by another account is never reconciled into the signed-in account', () => {
