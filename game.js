@@ -1559,12 +1559,15 @@ function toggleSound() {
 // --- DISPATCH & JOB GENERATION ---
 function generateJob(vip = false) {
   const z = getZone();
-  const pool = z.id === 'z1' ? VEHICLES.slice(0, 3) : VEHICLES;
+  const rig = RIG_TIERS[getRigTier() - 1] || RIG_TIERS[0];
+  // Keep freight-class calls out of early metro zones and gate them behind
+  // the first upgraded rig, even if a player reaches a freight zone early on REP.
+  const canDispatchHeavy = z.hubNum >= 2 && rig.tier >= 2;
+  const pool = canDispatchHeavy ? VEHICLES : VEHICLES.filter((vehicle) => !vehicle.heavy);
   const veh = pool[Math.floor(Math.random() * pool.length)];
   const dmg = DAMAGES[Math.floor(Math.random() * DAMAGES.length)];
   const weather = WEATHER_CONDITIONS[Math.floor(Math.random() * WEATHER_CONDITIONS.length)];
   const mile = Math.floor(Math.random() * 65) + 4;
-  const rig = RIG_TIERS[getRigTier() - 1];
   const rInfo = getRatingTierInfo();
   const callProfiles = veh.heavy
     ? [
