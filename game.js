@@ -1393,6 +1393,18 @@ function getDispatchRiskScore(job) {
     (job.vip ? 2 : 0);
 }
 
+function getDispatchRiskDetails(job, radarLevel = 0) {
+  const weather = job.weather || WEATHER_CONDITIONS[0];
+  const details = [];
+  if (job.isRusted) details.push(radarLevel >= 2 ? 'Seized lugs detected' : 'Possible lug corrosion');
+  if (job.hasWheelLock) details.push('Wheel-lock key required');
+  if (weather.id === 'rain') details.push('Rain conditions');
+  if (weather.id === 'night') details.push('Night visibility');
+  if (job.veh && job.veh.heavy) details.push('Heavy-duty vehicle');
+  if (job.vip) details.push('VIP response pressure');
+  return details;
+}
+
 function renderJobs() {
   const wrap = document.getElementById('job-list');
   if (!wrap) return;
@@ -1424,6 +1436,8 @@ function renderJobs() {
     const fastBonusEstimate = Math.round(j.pay * 0.08);
     const projected = Math.max(0, grossEstimate - overhead - supplyCost);
     const risk = getDispatchRiskScore(j);
+    const riskDetails = getDispatchRiskDetails(j, radarLvl);
+    const riskDetailText = riskDetails.length ? riskDetails.join(' · ') : 'No additional risk flags';
     const isRecommendedFirstCall = !!firstCallRecommendation && firstCallRecommendation.index === jobIndex;
     const riskLabel = risk >= 5 ? 'HIGH RISK' : risk >= 3 ? 'MODERATE' : 'ROUTINE';
     const riskColor = risk >= 5 ? '#fb7185' : risk >= 3 ? '#fbbf24' : '#34d399';
@@ -1455,6 +1469,7 @@ function renderJobs() {
           <span>NET EST. AFTER SUPPLIES <strong>${Math.round(projected)}</strong></span>
           <span>⏱ ${j.timeLimit}s SLA</span>
         </div>
+        <div class="dispatch-risk-details" style="font-size:10px;color:var(--muted);margin:3px 0 6px;" aria-label="Dispatch risk factors">Risk factors: ${riskDetailText}</div>
         <div class="dispatch-net-breakdown" style="display:flex;flex-wrap:wrap;gap:6px 12px;padding:7px 9px;margin:5px 0;background:rgba(15,23,42,.42);border-radius:7px;font-size:10px;color:var(--muted);">
           <span>Gross if accepted now: <strong style="color:var(--text);">${Math.round(grossEstimate)}</strong></span>
           <span>Supply reserve (not deducted from payout): <strong style="color:var(--text);">−${Math.round(supplyCost)}</strong></span>
