@@ -805,10 +805,15 @@ function renderContractBanner() {
   const c = state.contract;
   const ready = c.progress >= c.target;
   const pct = Math.min(100, Math.round((c.progress / c.target) * 100));
-  const zMult = getZone().mult;
-  const nextContractRank = Math.max(1, (state.contractsCompleted || 0) + 1);
-  const nextContractBonus = Math.min(0.30, Math.floor((nextContractRank - 1) / 2) * 0.05);
-  const displayedContractCash = Math.round(c.rewardCash * zMult * (1 + nextContractBonus));
+  // Display the exact reward locked when this contract was assigned.
+  const zMult = Number.isFinite(c.rewardZoneMult) ? c.rewardZoneMult : getZone().mult;
+  const contractRank = Number.isFinite(c.rewardContractRank)
+    ? c.rewardContractRank
+    : Math.max(1, (state.contractsCompleted || 0) + 1);
+  const contractBonus = Number.isFinite(c.rewardBonusRate)
+    ? c.rewardBonusRate
+    : Math.min(0.30, Math.floor((contractRank - 1) / 2) * 0.05);
+  const displayedContractCash = Math.round(c.rewardCash * zMult * (1 + contractBonus));
   box.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;">
       <span class="badge">📋 CONTRACT</span>
@@ -1296,7 +1301,12 @@ function renderJobs() {
       ? (heavy ? state.hdTires > 0 : state.stdTires > 0)
       : state.plugs > 0;
     const overhead = getFleetOverheadFee(j);
-    const projected = Math.max(0, j.pay * (state.surgeJobs > 0 ? 2 : 1) - overhead);
+    const stockPricing = getStockPricing();
+    const supplyCost = j.dmg.action === 'plug'
+      ? stockPricing.plugPackCost / stockPricing.plugPackQty
+      : (heavy ? stockPricing.hdCost : stockPricing.stdCost);
+    // This estimate includes the consumed supply, but excludes performance bonuses and penalties.
+    const projected = Math.max(0, j.pay * (state.surgeJobs > 0 ? 2 : 1) - overhead - supplyCost);
     const risk = (j.isRusted ? 2 : 0) + (j.hasWheelLock ? 1 : 0) + (w.id === 'rain' || w.id === 'night' ? 1 : 0) + (heavy ? 1 : 0) + (j.vip ? 2 : 0);
     const riskLabel = risk >= 5 ? 'HIGH RISK' : risk >= 3 ? 'MODERATE' : 'ROUTINE';
     const riskColor = risk >= 5 ? '#fb7185' : risk >= 3 ? '#fbbf24' : '#34d399';
@@ -1324,7 +1334,7 @@ function renderJobs() {
         <div class="dispatch-location-line">📍 ${j.locationLabel || 'Service area'} · ${j.callType || 'ROAD SERVICE'}</div>
         <div class="dispatch-intel-strip">
           <span style="color:${riskColor};">● ${riskLabel}</span>
-          <span>NET EST. <strong>$${projected}</strong></span>
+          <span>NET EST. AFTER SUPPLIES <strong>${Math.round(projected)}</strong></span>
           <span>⏱ ${j.timeLimit}s SLA</span>
         </div>
         <div class="job-meta">
