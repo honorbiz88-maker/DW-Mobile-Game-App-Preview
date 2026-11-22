@@ -966,6 +966,6 @@ test('new contract rolls exclude the previous contract and unavailable heavy obj
   assert.equal(state.contract.progress,0);
   assert.equal(state.contract.rewardZoneMult,1.25);
   assert.equal(state.contract.rewardContractRank,6);
-  assert.equal(state.contract.rewardBonusRate,0.25);
+  assert.equal(state.contract.rewardBonusRate,0.10);
   assert.equal(randomCalls,1);
 });
