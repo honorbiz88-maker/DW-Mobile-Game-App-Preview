@@ -118,7 +118,7 @@ function getDeviceId() {
   }
   return id;
 }
-function showConflict(localRaw, cloudData) {
+function showConflict(localRaw, cloudData, localOwnerUid = currentUser?.uid || null) {
   const open = window.openModal;
   if (typeof open !== "function") {
     status("A local and cloud career both exist. Open the menu again to resolve the save conflict.", true);
@@ -133,7 +133,7 @@ function showConflict(localRaw, cloudData) {
     <button class="secondary-btn" onclick="window.DelWinCloud.keepCloud()">RESTORE CLOUD CAREER</button>
     <p style="font-size:10px;color:var(--muted);">The copy you do not choose will be backed up on this device before anything is replaced.</p>
   `);
-  window.DelWinCloud.pendingConflict = { localRaw, cloudData, uid: currentUser?.uid || null };
+  window.DelWinCloud.pendingConflict = { localRaw, cloudData, uid: currentUser?.uid || null, localOwnerUid };
 }
 async function writeCloud(payload, expectedUid = currentUser?.uid) {
   if (!expectedUid || !currentUser || currentUser.uid !== expectedUid) {
@@ -154,6 +154,20 @@ async function reconcile(user) {
     if (!currentUser || currentUser.uid !== user.uid) return;
     const local = localSnapshot();
     if (local?.invalid) return;
+    if (local?.ownerUid && local.ownerUid !== user.uid) {
+      if (snap.exists()) {
+        const cloudData = snap.data();
+        if (cloudData?.schemaVersion === SCHEMA_VERSION && cloudData.payload && typeof cloudData.payload === "object" && !Array.isArray(cloudData.payload)) {
+          showConflict(local.raw, cloudData, local.ownerUid);
+          status("This device's career belongs to a different account. You may restore this account's cloud career; the device career will be backed up first.", true);
+        } else {
+          status("This device's career belongs to a different account, and the cloud save format is not recognized. Nothing was changed.", true);
+        }
+      } else {
+        status("This device's career belongs to a different account. Nothing was uploaded. Sign back into its original account or use another device for this account.", true);
+      }
+      return;
+    }
     if (!snap.exists()) {
       if (local?.ownerUid && local.ownerUid !== user.uid) {
         status("This device's career is linked to another account. Nothing was uploaded. Sign back into that account or restore it from a cloud backup.", true);
@@ -199,6 +213,10 @@ async function reconcile(user) {
 async function keepLocal() {
   const pending = window.DelWinCloud.pendingConflict;
   if (!pending || !currentUser || pending.uid !== currentUser.uid) return;
+  if (pending.localOwnerUid && pending.localOwnerUid !== pending.uid) {
+    status("This device's career belongs to another account. It cannot be uploaded to this account.", true);
+    return;
+  }
   try {
     if (pending.cloudData) {
       localStorage.setItem(`delwin_cloud_backup_${currentUser.uid}_${Date.now()}`, JSON.stringify(pending.cloudData));
