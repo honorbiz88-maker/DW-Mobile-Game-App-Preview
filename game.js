@@ -1397,8 +1397,11 @@ function acceptJob(jobId) {
     lugHealth[l.id] = job.isRusted ? (job.rustLayers || 2) : 1;
   });
 
+  const acceptedSurgeMultiplier = state.surgeJobs > 0 ? 2 : 1;
+  if (acceptedSurgeMultiplier > 1) state.surgeJobs -= 1;
   state.activeJob = {
     ...job,
+    surgeMultiplier: acceptedSurgeMultiplier,
     weather: job.weather || WEATHER_CONDITIONS[0],
     timeLimit: startSec,
     timeLeft: startSec,
@@ -2185,8 +2188,8 @@ function completeJob() {
     return;
   }
 
-  const mult = state.surgeJobs > 0 ? 2 : 1;
-  if (state.surgeJobs > 0) state.surgeJobs--;
+  // A Surge is assigned when the player accepts a call, not retroactively mid-repair.
+  const mult = Number.isFinite(job.surgeMultiplier) ? job.surgeMultiplier : 1;
   const gross = job.pay * mult;
   const isFast = job.timeLeft >= Math.round(job.timeLimit * 0.45);
   const speedBonus = isFast ? Math.round(job.pay * 0.08) : 0;
