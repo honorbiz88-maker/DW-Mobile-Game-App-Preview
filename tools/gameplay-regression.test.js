@@ -136,8 +136,13 @@ test('a deliberate cloud restore survives reload without reopening the same conf
   const reconcile = cloudSource.slice(reconcileStart, reconcileEnd);
   assert.match(reconcile, /restoreMarker\?\.uid === user\.uid/);
   assert.match(reconcile, /restoreMarker\.revision === cloudRevision/);
+  assert.match(reconcile, /restoreMarker\.deviceId && cloud\.deviceId === restoreMarker\.deviceId/);
+  assert.match(reconcile, /queueSave\(local\.payload\)/);
+  assert.match(reconcile, /JSON\.stringify\(local\.payload\) === JSON\.stringify\(cloud\.payload\)/);
+  assert.match(reconcile, /reconcilingUids\.has\(user\.uid\)/);
   assert.ok(reconcile.indexOf('RESTORE_MARKER_KEY') < reconcile.indexOf('if (!local)'));
   assert.match(reconcile, /Cloud career restored and connected/);
+  assert.match(cloudSource, /restoreMarker\?\.uid === expectedUid[\s\S]*?removeItem\(RESTORE_MARKER_KEY\)/);
 });
 
 test('local career owned by another account is never reconciled into the signed-in account', () => {
