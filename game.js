@@ -964,10 +964,12 @@ function renderStockBar() {
   const plugFull = state.plugs >= rig.capPlugs;
   const stdFull = state.stdTires >= rig.capStd;
   const hdFull = state.hdTires >= rig.capHd;
+  const plugRestockQty = Math.min(sp.plugPackQty, Math.max(0, rig.capPlugs - state.plugs));
+  const plugRestockCost = Math.ceil(sp.plugPackCost * plugRestockQty / sp.plugPackQty);
 
   bar.innerHTML = `
     <button class="dw-stock-btn ${state.plugs === 0 ? 'low' : plugFull ? 'full' : ''}" onclick="buyStock('plug')">
-      Plugs: <strong>${state.plugs}/${rig.capPlugs}</strong><br><span style="color:var(--amber);">${plugFull ? 'CARGO FULL' : `+${sp.plugPackQty} ($${sp.plugPackCost})`}</span>
+      Plugs: <strong>${state.plugs}/${rig.capPlugs}</strong><br><span style="color:var(--amber);">${plugFull ? 'CARGO FULL' : `+${plugRestockQty} (${plugRestockCost})`}</span>
     </button>
     <button class="dw-stock-btn ${state.stdTires === 0 ? 'low' : stdFull ? 'full' : ''}" onclick="buyStock('std')">
       Std Tires: <strong>${state.stdTires}/${rig.capStd}</strong><br><span style="color:var(--amber);">${stdFull ? 'CARGO FULL' : `+1 ($${sp.stdCost})`}</span>
@@ -2278,12 +2280,14 @@ function buyStock(type) {
       showAlert('CARGO CAPACITY FULL', `${rig.name} holds max ${rig.capPlugs} Plug Kits. Upgrade your Rig Tier in the Garage for more cargo space!`);
       return;
     }
-    if (state.cash >= sp.plugPackCost) {
-      state.cash -= sp.plugPackCost;
-      state.plugs = Math.min(rig.capPlugs, state.plugs + sp.plugPackQty);
+    const restockQty = Math.min(sp.plugPackQty, rig.capPlugs - state.plugs);
+    const restockCost = Math.ceil(sp.plugPackCost * restockQty / sp.plugPackQty);
+    if (state.cash >= restockCost) {
+      state.cash -= restockCost;
+      state.plugs += restockQty;
       SoundFX.torqueClick();
     } else {
-      showAlert('INSUFFICIENT CASH', `Need $${sp.plugPackCost} to restock +${sp.plugPackQty} Plug Kits.`);
+      showAlert('INSUFFICIENT CASH', `Need ${restockCost} to restock +${restockQty} Plug Kits.`);
       return;
     }
   } else if (type === 'std') {
