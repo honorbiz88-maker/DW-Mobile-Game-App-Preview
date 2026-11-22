@@ -1,0 +1,27 @@
+name: Gameplay regression tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "game.js"
+      - "tools/gameplay-regression.test.js"
+      - ".github/workflows/gameplay-regression.yml"
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Preview
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run deterministic gameplay regression tests
+        run: node --test tools/gameplay-regression.test.js
+      - name: Verify game JavaScript syntax
+        run: node --check game.js
