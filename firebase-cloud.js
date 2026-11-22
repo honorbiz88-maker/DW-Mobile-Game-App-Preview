@@ -209,7 +209,8 @@ async function reconcile(user) {
           // never queue it over the selected cloud career.
           if (local) backupLocal(local.raw, "restore-reconciliation");
           localStorage.setItem(LOCAL_KEY, cloudPayload);
-          localStorage.removeItem(RESTORE_MARKER_KEY);
+          // Keep the marker across this reload so game boot cannot write its
+          // normalized state before Firebase confirms the restored cloud copy.
           syncReady = false;
           status("Cloud career restored. Your previous device career remains backed up.");
           location.reload();
@@ -389,7 +390,7 @@ function isRestorePending() {
   if (!currentUser) return false;
   try {
     const marker = JSON.parse(localStorage.getItem(RESTORE_MARKER_KEY) || "null");
-    return marker?.uid === currentUser.uid;
+    return !!marker?.uid && (!currentUser || marker.uid === currentUser.uid);
   } catch {
     return false;
   }
