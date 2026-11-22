@@ -725,3 +725,56 @@ test('wheel-lock key adapter only seats during stage two on an actually locked w
   assert.equal(job.lockKeyApplied, true);
   assert.ok(alerts.some(x => /KEY ALREADY SEATED/.test(x)));
 });
+
+
+test('rain-slicked lug slip causes no removal until a successful retry', () => {
+  const job = {
+    step: 2, weather: { id: 'rain' }, floodlightsOn: true,
+    hasWheelLock: false, lugHealth: { 1: 1, 2: 1, 3: 1, 4: 1, 5: 1 },
+    lugsRemoved: [], penalties: 0, repPenalties: 0, penaltyLog: []
+  };
+  const state = { activeJob: job, tools: { impact: { level: 1 } } };
+  const alerts = [];
+  const randomValues = [0.1, 0.5];
+  const tap = gameFunction('tapLug', {
+    state, WEATHER_CONDITIONS: [{ id: 'clear' }], STAR_ORDER: [1, 3, 5, 2, 4],
+    addBayPenalty: () => {}, showAlert: title => alerts.push(title),
+    showBayActionHint: () => {}, renderBay: () => {}, dismissAlert: () => {},
+    SoundFX: { error: () => {}, impact: () => {}, torqueClick: () => {} },
+    triggerLugSpin: () => {},
+    Math: { random: () => randomValues.shift(), floor: Math.floor, max: Math.max }
+  });
+  tap(1);
+  assert.equal(job.lugHealth[1], 1);
+  assert.deepEqual(job.lugsRemoved, []);
+  assert.ok(alerts.some(x => /WET SOCKET SLIP/.test(x)));
+  tap(1);
+  assert.equal(job.lugHealth[1], 0);
+  assert.deepEqual(job.lugsRemoved, [1]);
+});
+
+test('rusted lug health requires repeated impact power before removal', () => {
+  const job = {
+    step: 2, weather: { id: 'clear' }, floodlightsOn: true,
+    hasWheelLock: false, isRusted: true, lugHealth: { 1: 3, 2: 1, 3: 1, 4: 1, 5: 1 },
+    lugsRemoved: [], penalties: 0, repPenalties: 0, penaltyLog: []
+  };
+  const state = { activeJob: job, tools: { impact: { level: 1 } } };
+  const tap = gameFunction('tapLug', {
+    state, WEATHER_CONDITIONS: [{ id: 'clear' }], STAR_ORDER: [1, 3, 5, 2, 4],
+    addBayPenalty: () => {}, showAlert: () => {}, showBayActionHint: () => {},
+    renderBay: () => {}, dismissAlert: () => {},
+    SoundFX: { error: () => {}, impact: () => {}, torqueClick: () => {} },
+    triggerLugSpin: () => {},
+    Math: { random: () => 1, floor: Math.floor, max: Math.max }
+  });
+  tap(1);
+  assert.equal(job.lugHealth[1], 2);
+  assert.deepEqual(job.lugsRemoved, []);
+  tap(1);
+  assert.equal(job.lugHealth[1], 1);
+  assert.deepEqual(job.lugsRemoved, []);
+  tap(1);
+  assert.equal(job.lugHealth[1], 0);
+  assert.deepEqual(job.lugsRemoved, [1]);
+});
