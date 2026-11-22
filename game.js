@@ -227,6 +227,7 @@ let state = {
     comp: { name: 'Portable Air Compressor', level: 1, baseCost: 80, prefix: 'tool-comp', icon: '💨' },
     radar: { name: 'Dispatch GPS Radar', level: 1, baseCost: 90, prefix: 'tool-radar', icon: '📡' }
   },
+  customerLedger: {},
   jobs: [],
   activeJob: null
 };
@@ -260,6 +261,7 @@ function loadState() {
       }
     }
     if (!Array.isArray(state.ratings) || state.ratings.length === 0) state.ratings = [5.0];
+    if (!state.customerLedger || typeof state.customerLedger !== 'object' || Array.isArray(state.customerLedger)) state.customerLedger = {};
     if (!Array.isArray(state.jobs)) state.jobs = [];
     state.jobs = state.jobs.filter((j) => j && j.veh && typeof j.veh === 'object' && j.dmg && typeof j.dmg === 'object');
     if (state.activeJob && (!state.activeJob.veh || typeof state.activeJob.veh !== 'object' || !state.activeJob.dmg || typeof state.activeJob.dmg !== 'object')) {
@@ -2125,6 +2127,10 @@ function completeJob() {
   const overheadFee = getFleetOverheadFee(job);
   const totalDeductions = job.penalties + overheadFee;
   const net = Math.max(15, gross + speedBonus - totalDeductions);
+  const customerKey = job.customer || 'Roadside Customer';
+  const priorVisits = Math.max(0, Number(state.customerLedger[customerKey]) || 0);
+  const repeatBonusRate = priorVisits >= 4 ? 0.08 : priorVisits >= 2 ? 0.05 : 0;
+  const repeatBonus = repeatBonusRate > 0 ? Math.round(gross * repeatBonusRate) : 0;
 
   const z = getZone();
   const fallbackBaseRep = Math.round(((job.dmg && job.dmg.action === 'swap' ? 32 : 24) + (job.veh && job.veh.heavy ? 12 : 0)) * z.mult);
@@ -2136,7 +2142,8 @@ function completeJob() {
   state.rep = Math.max(0, state.rep + netRep);
 
   const isCleanJob = job.penalties === 0;
-  state.cash += net;
+  state.cash += net + repeatBonus;
+  state.customerLedger[customerKey] = priorVisits + 1;
   state.jobsCompleted = (state.jobsCompleted || 0) + 1;
   if (isCleanJob) state.streak = (state.streak || 0) + 1;
   else state.streak = 0;
@@ -2177,7 +2184,8 @@ function completeJob() {
     <h3>${job.title}</h3>
     <div style="background:#090c12;padding:12px;border-radius:10px;font-size:13px;display:flex;flex-direction:column;gap:6px;">
       <div style="display:flex;justify-content:space-between;"><span>Base + Weather Payout:</span><strong style="color:var(--green);">+$${gross}</strong></div>
-      <div style="display:flex;justify-content:space-between;"><span>Fast-Response Bonus:</span><strong style="color:var(--blue);">+$${speedBonus}</strong></div>
+      <div style="display:flex;justify-content:space-between;"><span>Fast-Response Bonus:</span><strong style="color:var(--blue);">+${speedBonus}</strong></div>
+      ${repeatBonus > 0 ? `<div style="display:flex;justify-content:space-between;"><span>Repeat Customer Loyalty (${Math.round(repeatBonusRate * 100)}%):</span><strong style="color:var(--amber);">+${repeatBonus}</strong></div>` : priorVisits > 0 ? `<div style="color:var(--muted);font-size:11px;">Customer relationship: visit ${priorVisits + 1} · loyalty bonus unlocks after 3 completed visits.</div>` : ''}
       <div style="display:flex;justify-content:space-between;"><span>Fleet Fuel & Dispatch Overhead:</span><strong style="color:var(--muted);">-$${overheadFee}</strong></div>
       ${job.penalties > 0 ? `<div style="display:flex;justify-content:space-between;"><span>Bay & SLA Penalties:</span><strong style="color:var(--red);">-$${job.penalties}</strong></div>` : ''}
       ${logHtml}
