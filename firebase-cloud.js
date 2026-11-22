@@ -230,6 +230,53 @@ window.addEventListener("online", () => {
   if (currentUser) reconcile(currentUser);
 });
 accountCard();
+
+// TEMPORARY PREVIEW-ONLY AUTH API KEY DIAGNOSTIC.
+// Deliberately invalid email/password ensures this request cannot create an account.
+(function addAuthKeyDiagnostic() {
+  const statusEl = document.getElementById("cloud-account-status");
+  if (!statusEl || document.getElementById("cloud-auth-diagnostic")) return;
+  const button = document.createElement("button");
+  button.id = "cloud-auth-diagnostic";
+  button.type = "button";
+  button.className = "ghost-btn";
+  button.textContent = "RUN AUTH CONNECTION CHECK";
+  button.style.cssText = "font-size:10px;padding:7px;margin-top:4px;";
+  statusEl.insertAdjacentElement("afterend", button);
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    button.textContent = "CHECKING…";
+    status("Testing Firebase Authentication connection…");
+    try {
+      const response = await fetch(
+        "https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=" + encodeURIComponent(firebaseConfig.apiKey),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: "not-a-valid-email",
+            password: "x",
+            returnSecureToken: true
+          })
+        }
+      );
+      const data = await response.json().catch(() => ({}));
+      const code = data?.error?.message || (response.ok ? "UNEXPECTED_SUCCESS" : "UNKNOWN_ERROR");
+      if (code === "INVALID_EMAIL" || code === "WEAK_PASSWORD" || code === "MISSING_EMAIL") {
+        status("AUTH KEY CHECK: API KEY ACCEPTED. Firebase rejected the deliberately invalid test input (" + code + "). The key is reaching Authentication.", true);
+      } else if (code === "API_KEY_INVALID" || code === "PROJECT_NOT_FOUND") {
+        status("AUTH KEY CHECK: FIREBASE REJECTED THE API KEY (" + code + "). This confirms a project/key-side problem.", true);
+      } else {
+        status("AUTH KEY CHECK RESULT: " + code + ". HTTP " + response.status + ". Share this exact result.", true);
+      }
+    } catch (error) {
+      status("AUTH KEY CHECK NETWORK ERROR: " + error.message, true);
+    } finally {
+      button.disabled = false;
+      button.textContent = "RUN AUTH CONNECTION CHECK";
+    }
+  });
+})();
 onAuthStateChanged(auth, user => {
     currentUser = user;
     syncReady = false;
