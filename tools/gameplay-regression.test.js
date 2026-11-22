@@ -1624,7 +1624,7 @@ test('gameplay save routine defers local writes while an accepted cloud restore 
 test('cloud restore overrides a boot-normalized device save and keeps it only as a backup', async () => {
   const cloudCareer = { cash: 120, jobsCompleted: 4 };
   const normalizedLocalCareer = { cash: 120, jobsCompleted: 4, migrated: true };
-  const marker = { uid: 'account-B', revision: null, deviceId: 'test-device-id' };
+  const marker = { uid: 'account-B', revision: null, deviceId: 'test-device-id', cloudPayload: cloudCareer };
   const h = cloudModuleHarness({
     local: {
       delwin_v4_save: JSON.stringify(normalizedLocalCareer),
