@@ -922,7 +922,7 @@ test('territory selection enforces REP unlocks and refuses switching during an a
   assert.equal(state.zoneId,'z2');
   assert.equal(saves,1);
   assert.ok(alerts.some(x=>/ACTIVE CALL IN PROGRESS/.test(x)));
-  assert.equal(pages,1);
+  assert.equal(pages,2); // successful dispatch to zone, then active-call redirect to bay
 });
 
 test('heavy dispatch and heavy contracts remain locked until both Hub 2 and Tier 2 rig are active', () => {
@@ -959,7 +959,7 @@ test('new contract rolls exclude the previous contract and unavailable heavy obj
     state,CONTRACT_POOL:pool,
     isContractAvailable:c=>c.type!=='heavy',
     getZone:()=>({mult:1.25}),
-    Math:{random:()=>{randomCalls++;return 0;}}
+    Math:{random:()=>{randomCalls++;return 0;},floor:Math.floor}
   });
   roll();
   assert.equal(state.contract.id,'c_plugs');
