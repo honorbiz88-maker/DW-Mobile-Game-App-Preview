@@ -161,16 +161,16 @@ Interpretation:
 ### Current conclusions
 
 - The verified full tool-plus-rig cash requirement is **$2,532,730** with the established discounts restored.
-- The revised Gear schedule is designed to put a typical player near the 75-Gear requirement over a full career, with the contract cadence as the main variable. Re-run the full progression simulation against the new reward schedule before treating the earlier max-progression call counts as current.
+- The revised Gear-only Monte Carlo puts typical players at the 75-Gear requirement at a median of about 2,660 calls (p10–p90: 2,507–2,813). This is not a full time-to-max simulation: cash, REP, finite inventory, and supply affordability remain unmodeled and can extend actual progression.
 - Rig maintenance now has a capped operating-overhead effect (0–20%) and service costs $1.50 per condition point restored. It is a modest operating incentive, not a hard failure gate.
 - Dispatch estimates subtract the estimated replacement cost of the consumed supply. The estimate excludes performance bonuses and penalties by design.
 - The previous source-driven Monte Carlo audit used the more generous reward schedule; its old Gear-balance outputs are historical and superseded. A new Gear-only career simulation now models the reduced reward streams, the actual five contract objectives, contract exclusion/rotation, the 20-call streak, the 10/30/60/100/175/275 career milestones, and claim delays. It still does not model cash, REP, inventory, or supply affordability.
-- The model assumes the player always chooses the highest unlocked territory, buys upgrades in a balanced order, accepts VIP calls when offered and affordable, and claims completed contracts after the modeled delay. It uses aggregate clean/fast probabilities and average penalty amounts rather than simulating every individual bay mistake.
+- The reduced-schedule Gear model assumes all non-Gear progression gates can be met when needed. It models contract claim delays, but not player routing choices, VIP token affordability, cash flow, or individual repair-step mistakes. See the dedicated reduced-schedule simulation section for the exact assumptions.
 - Supply costs are modeled at long-run replacement cost per call. The model does **not** yet simulate finite stock inventory, cargo-capacity restocking, or a cash-starved player being unable to buy the next supply. Results are directional pacing estimates, not observed telemetry or a release promise.
 
 ### Economy stress test — 2026-11-22
 
-Each scenario uses 30 seeded runs. These call counts were generated before the Gold Gear reward reduction below and are now **historical / superseded**; do not use them as current time-to-max estimates. Re-run progression with the revised contract and clean-streak rewards before using new call counts.
+Each scenario uses 30 seeded runs. These call counts were generated before the Gold Gear reward reduction and are **historical / superseded**. They describe the former full-economy model, not the revised Gear-only simulation below; do not use them as current time-to-max estimates.
 
 | Scenario | Main assumptions | Calls to max progression |
 |---|---|---:|
