@@ -888,3 +888,13 @@ button, .lug-btn, .hud-pill-compact {
 .shop-resource span{font-size:10px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.6px}
 .shop-recharge-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0 3px;font-size:12px;font-weight:800;border-top:1px solid rgba(120,153,184,.14)}
 .shop-recharge-row strong{color:var(--blue);font-variant-numeric:tabular-nums}
+
+
+/* Dispatch decision intelligence */
+.dispatch-intel-card{position:relative}
+.dispatch-intel-strip{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px;padding:8px 9px;margin:7px 0;background:rgba(5,12,22,.72);border:1px solid rgba(130,160,190,.18);border-radius:9px;font-size:10px;font-weight:800;letter-spacing:.35px}
+.dispatch-intel-strip strong{color:var(--green);font-size:12px}
+.dispatch-prep-note{font-size:11px;font-weight:750;padding:7px 9px;border-radius:7px;margin:5px 0 8px}
+.dispatch-prep-note.ready{color:#86efac;background:rgba(16,185,129,.09);border:1px solid rgba(16,185,129,.22)}
+.dispatch-prep-note.warning{color:#fbbf24;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.28)}
+.dispatch-intel-card .primary-btn:disabled{opacity:.55;filter:saturate(.45)}
