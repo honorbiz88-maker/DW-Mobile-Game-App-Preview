@@ -130,6 +130,34 @@ The first Tier 2 Gear threshold is reached around call 60 in typical and rough s
 
 **Interpretation:** the reduced Gear economy is now meaningfully tighter. Typical players approach full Gear progression around 2,800 calls with prompt contract claims; weaker execution or delayed claims extends the career substantially. Do not raise Gear rewards or change Gear costs from this model alone. The next product-side improvement should make a completed contract and its claim action unmistakable, then validate actual claim behavior in playtests.
 
+### Reduced Gear schedule Monte Carlo audit — 2026-11-22
+
+A fresh source-aligned, seeded Monte Carlo model was run against the **reduced** reward schedule. This replaces the pre-reduction Gear surplus figures and tests the actual contract objective pool rather than assuming a fixed contract every 7–8 calls.
+
+Model behavior and limits:
+- 5,000 seeded careers per scenario were simulated to 2,600 calls; 2,000 seeded careers per scenario were simulated to the 75-Gear target.
+- The model starts with the game's initial 4-clean-call contract. Subsequent contracts are selected uniformly from the available pool, excluding the just-completed contract; Heavy contracts enter the pool only after Tier 2 is unlocked.
+- It models the source objective targets: 4 consecutive clean calls, 3 plugs, 3 swaps, 3 fast calls, or 2 Heavy vehicle swaps. Damage is modeled at the source pool ratio (20% plug / 80% swap); after Tier 2, Heavy vehicles are 2 of 5 vehicle types (40%).
+- Clean-call and fast-call probabilities are scenario inputs. Calls are independent in the model. The 20-call clean streak resets on a non-clean call and awards one Gear at 20.
+- Career awards are applied at their configured call milestones. Contract awards are applied once per 6 contracts actually claimed. A completed contract blocks the next contract until claimed; delay scenarios hold the completed contract for the stated number of additional calls.
+- Gear spending is modeled in progression order: 5 Gears for Hub 2, then 10, 15, 20, and 25 for Hubs 3–6. This represents four tool breakthroughs plus the rig commission at each tier.
+- The model does **not** simulate cash affordability, REP/territory unlocks, finite inventory, service mistakes in individual repair steps, or a real player's decision to delay or skip upgrades. It assumes all non-Gear requirements can be met when needed. Results are directional Gear pacing estimates, not observed telemetry or guaranteed time-to-max.
+
+| Scenario | Assumptions | Mean Gears earned by 2,600 calls | Mean contracts claimed | Median highest Hub by Gear supply | Median calls to earn 75 Gears (p10–p90) |
+|---|---|---:|---:|---:|---:|
+| Strong execution | 90% clean, 85% fast; prompt claims | 114.5 | 385 | 6 | 1,564 (1,424–1,708) |
+| Typical execution | 75% clean, 65% fast; prompt claims | 73.2 | 339 | 5 | 2,660 (2,507–2,813) |
+| Typical, no streak awards | 75% clean, 65% fast; streak Gear disabled | 71.1 | 339 | 5 | 2,755 (2,623–2,894) |
+| Rough execution | 55% clean, 40% fast; 2-call claim delay | 48.0 | 200 | 4 | 4,662 (4,394–4,923) |
+| Poor execution | 35% clean, 30% fast; 5-call claim delay | 27.8 | 80 | 3 | 11,582 (10,361–12,938) |
+
+Interpretation:
+- The typical case reaches the 75-Gear requirement at about **2,660 calls**, close to the previous career pacing target. Without any 20-call streak awards, the median rises by about 95 calls, so streak rewards are a modest bonus for typical execution rather than the main Gear source.
+- Typical players average about 339 claimed contracts in 2,600 calls, or one per 7.7 calls. The 6-contract milestone contributes about 56.5 Gears; career milestones contribute 15; clean streaks contribute about 2.1 more.
+- The first Hub 2 Gear package is reached by call 60 in the typical, rough, and poor scenarios from career milestones alone. Strong execution reaches it earlier when contract milestones arrive sooner. Actual Hub 2 access can still be later because the simulation does not enforce cash, 1,800 REP, territory, or tool-level requirements.
+- Rough and poor execution fall well short of the full 75-Gear target by 2,600 calls. The Gear economy becomes a meaningful long-run gate for lower-performance players; the poor case takes roughly 11,600 calls in this model. This is a material balancing risk to review in playtesting, not a reason to immediately restore the old generous rewards.
+- A player who never claims the first completed contract blocks all subsequent contracts. In that case the contract Gear stream stops entirely; career milestones and occasional clean streaks alone cannot support full progression. The claim action must remain highly visible and should be tested on mobile.
+
 ### Current conclusions
 
 - The verified full tool-plus-rig cash requirement is **$2,532,730** with the established discounts restored.
