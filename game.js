@@ -2444,57 +2444,50 @@ function renderShop() {
   const surgeRemMs = syncSurgeRecharge();
   const tokRemMs = syncTokenDropRecharge();
   const surgeCdTxt = state.surgeCharges < MAX_SURGE_CHARGES
-    ? `Next charge: ${formatMs(surgeRemMs)}`
-    : 'Max Charges';
+    ? `Next free charge: ${formatMs(surgeRemMs)}`
+    : 'Fully recharged';
   const tokCdTxt = state.tokenDropCharges < MAX_TOKEN_DROPS
-    ? `Next charge: ${formatMs(tokRemMs)}`
-    : 'Max Charges';
+    ? `Next free charge: ${formatMs(tokRemMs)}`
+    : 'Fully recharged';
 
   root.innerHTML = `
-    <div class="item-card">
-      <span class="badge">SPONSORED AD DROPS (COOLDOWN GATED)</span>
-      <h3>Free Supply & Surge Transmissions</h3>
-      <div class="ctrl-grid-2" style="margin-top:6px;">
-        <button type="button" class="secondary-btn" ${state.surgeCharges <= 0 ? 'disabled' : ''} onclick="watchRewardedAd('surge')" style="font-size:11px;padding:9px 6px;">
-          📺 +1 Surge (${state.surgeCharges}/${MAX_SURGE_CHARGES})<br><span style="font-size:10px;color:var(--amber);">${surgeCdTxt}</span>
-        </button>
-        <button type="button" class="secondary-btn" ${state.tokenDropCharges <= 0 ? 'disabled' : ''} onclick="watchRewardedAd('tokens')" style="font-size:11px;padding:9px 6px;">
-          📺 +3 ⚡ Tokens (${state.tokenDropCharges}/${MAX_TOKEN_DROPS})<br><span style="font-size:10px;color:var(--amber);">${tokCdTxt}</span>
-        </button>
+    <div class="item-card shop-status-card">
+      <span class="badge">DELWIN SUPPLY DEPOT</span>
+      <h3>Career resources</h3>
+      <p style="font-size:12px;color:var(--muted);">This preview is free to play. No real-money purchases or simulated advertisements are used. Earn resources through completed calls, contracts, clean streaks and natural recharge.</p>
+      <div class="ctrl-grid-2" style="margin-top:10px;">
+        <div class="shop-resource"><strong>${state.cash.toLocaleString()}</strong><span>Fleet Cash</span></div>
+        <div class="shop-resource"><strong>${state.parts}</strong><span>Gold Gears</span></div>
+        <div class="shop-resource"><strong>${state.tokens}</strong><span>Dispatch Tokens</span></div>
+        <div class="shop-resource"><strong>${state.plugs + state.stdTires + state.hdTires}</strong><span>Total Cargo Units</span></div>
       </div>
-      <button type="button" class="secondary-btn" onclick="watchRewardedAd('restock')" style="margin-top:4px;font-size:11px;">
-        📺 Free Cargo Restock Drop (Plugs + Std/HD Tires)
-      </button>
+    </div>
+
+    <div class="item-card">
+      <span class="badge">FREE RECHARGE</span>
+      <h3>Dispatch abilities</h3>
+      <div class="shop-recharge-row"><span>⚡ 2X Surge charges</span><strong>${state.surgeCharges}/${MAX_SURGE_CHARGES}</strong></div>
+      <p style="font-size:11px;color:var(--muted);">${surgeCdTxt} · Recharges automatically.</p>
+      <div class="shop-recharge-row"><span>📡 Dispatch scan drops</span><strong>${state.dispatchScans}/${MAX_DISPATCH_SCANS}</strong></div>
+      <p style="font-size:11px;color:var(--muted);">${state.dispatchScans >= MAX_DISPATCH_SCANS ? 'Fully recharged' : `Next scan: ${formatMs(syncDispatchScanRecharge())}`} · Recharges automatically.</p>
+      <div class="shop-recharge-row"><span>⚡ Token drops</span><strong>${state.tokenDropCharges}/${MAX_TOKEN_DROPS}</strong></div>
+      <p style="font-size:11px;color:var(--muted);">${tokCdTxt} · Recharges automatically.</p>
     </div>
 
     <div class="item-card" style="border-color:var(--amber);">
       <span class="badge">FOUNDRY EXCHANGE</span>
-      <h3>Convert Dispatch Tokens → Gold Gear</h3>
-      <p style="font-size:12px;color:var(--muted);">
-        Earn Gold Gears every ${CLEAN_STREAK_GEAR_INTERVAL} clean calls (+2 at 9 streak, +3 at 15 streak), via Contracts, or forge 1 ⚙️ Gear for ${TOKEN_TO_GEAR_COST} ⚡ Tokens.
-      </p>
+      <h3>Convert Tokens into Gold Gears</h3>
+      <p style="font-size:12px;color:var(--muted);">Earn Gold Gears from clean-call streaks and contracts, or forge one for ${TOKEN_TO_GEAR_COST} Dispatch Tokens.</p>
       <button type="button" class="primary-btn" ${state.tokens < TOKEN_TO_GEAR_COST ? 'disabled' : ''} onclick="exchangeTokensForGear()">
-        FORGE 1 ⚙️ GOLD GEAR (${TOKEN_TO_GEAR_COST} ⚡ · YOU HAVE ${state.tokens} ⚡)
+        FORGE 1 GOLD GEAR · ${TOKEN_TO_GEAR_COST} TOKENS
       </button>
     </div>
 
     <div class="item-card">
-      <span class="badge">FLEET CREDIT & GEAR PACKS</span>
-      <h3>Instant Dispatch Packs</h3>
-      <div class="stack-list" style="margin-top:8px;">
-        <button type="button" class="primary-btn" onclick="buyPack('starter')">
-          Starter Roadside Kit — 25 ⚡ + 1 ⚙️ + $500 ($1.99)
-        </button>
-        <button type="button" class="primary-btn" onclick="buyPack('pro')">
-          Pro Fleet Bundle — 70 ⚡ + 3 ⚙️ + $1,800 ($4.99)
-        </button>
-        <button type="button" class="primary-btn" onclick="buyPack('yard')">
-          Commercial Yard Crate — 160 ⚡ + 8 ⚙️ + $5,000 ($9.99)
-        </button>
-        <button type="button" class="primary-btn" onclick="buyPack('apex')">
-          Apex Syndicate Vault — 380 ⚡ + 20 ⚙️ + $15,000 ($19.99)
-        </button>
-      </div>
+      <span class="badge">FLEET RESTOCK</span>
+      <h3>Buy supplies with earned cash</h3>
+      <p style="font-size:12px;color:var(--muted);">Restock plugs and tires from the Dispatch screen. Prices scale with your rig and operating zone. Cargo capacity is limited by your current rig tier.</p>
+      <button type="button" class="secondary-btn" onclick="goPage('dispatch')">RETURN TO DISPATCH & RESTOCK</button>
     </div>
   `;
 }
