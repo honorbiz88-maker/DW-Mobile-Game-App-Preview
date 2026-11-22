@@ -66,7 +66,8 @@ test('cloud save queue is bound to the account that created it', () => {
   assert.equal(belongs({ uid: 'account-A', payload: { cash: 10 } }, { uid: 'account-B' }), false);
   assert.equal(belongs({ uid: 'account-A' }, null), false);
   assert.match(cloudSource, /const queuedUid = currentUser\.uid;/);
-  assert.match(cloudSource, /currentUser\.uid !== queuedUid/);
+  assert.match(cloudSource, /currentUser\.uid !== expectedUid/);
+  assert.match(cloudSource, /pendingBelongsToUser\(pendingPayload, currentUser\)/);
   assert.match(cloudSource, /pendingPayload = \{ uid: queuedUid, payload:/);
 });
 
