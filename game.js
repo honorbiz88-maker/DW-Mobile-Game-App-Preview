@@ -2213,7 +2213,8 @@ function completeJob() {
     if (state.jobsCompleted >= milestone && !claimed.includes(milestone)) { earnedCareerGear += reward; claimed.push(milestone); }
   });
   if (earnedCareerGear > 0) state.parts += earnedCareerGear;
-  state.rigCondition = Math.max(0, (Number(state.rigCondition) || 100) - (job.veh && job.veh.heavy ? 2.5 : 1.5));
+  const currentRigCondition = Number.isFinite(state.rigCondition) ? state.rigCondition : 100;
+  state.rigCondition = Math.max(0, currentRigCondition - (job.veh && job.veh.heavy ? 2.5 : 1.5));
   if (isCleanJob) state.streak = (state.streak || 0) + 1;
   else state.streak = 0;
 
