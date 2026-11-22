@@ -1020,22 +1020,28 @@ function renderStockBar() {
   }
   const rig = getActiveRigObj();
   const sp = getStockPricing();
-  const plugFull = state.plugs >= rig.capPlugs;
-  const stdFull = state.stdTires >= rig.capStd;
-  const hdFull = state.hdTires >= rig.capHd;
-  const plugRestockQty = Math.min(sp.plugPackQty, Math.max(0, rig.capPlugs - state.plugs));
-  const plugRestockCost = Math.ceil(sp.plugPackCost * plugRestockQty / sp.plugPackQty);
-
-  bar.innerHTML = `
-    <button class="dw-stock-btn ${state.plugs === 0 ? 'low' : plugFull ? 'full' : ''}" onclick="buyStock('plug')">
-      Plugs: <strong>${state.plugs}/${rig.capPlugs}</strong><br><span style="color:var(--amber);">${plugFull ? 'CARGO FULL' : `+${plugRestockQty} (${plugRestockCost})`}</span>
-    </button>
-    <button class="dw-stock-btn ${state.stdTires === 0 ? 'low' : stdFull ? 'full' : ''}" onclick="buyStock('std')">
-      Std Tires: <strong>${state.stdTires}/${rig.capStd}</strong><br><span style="color:var(--amber);">${stdFull ? 'CARGO FULL' : `+1 ($${sp.stdCost})`}</span>
-    </button>
-    <button class="dw-stock-btn ${state.hdTires === 0 ? 'low' : hdFull ? 'full' : ''}" onclick="buyStock('hd')">
-      HD Tires: <strong>${state.hdTires}/${rig.capHd}</strong><br><span style="color:var(--amber);">${hdFull ? 'CARGO FULL' : `+1 ($${sp.hdCost})`}</span>
+  const plugQty = Math.min(sp.plugPackQty, Math.max(0, rig.capPlugs - state.plugs));
+  const plugCost = Math.ceil(sp.plugPackCost * plugQty / sp.plugPackQty);
+  const stdCost = sp.stdCost;
+  const hdCost = sp.hdCost;
+  const stockCard = (type, label, count, capacity, cost, qty, full) => {
+    const shortfall = Math.max(0, cost - state.cash);
+    const status = full ? 'CARGO FULL' : shortfall > 0 ? `NEED $${shortfall.toLocaleString()} MORE` : `+${qty} · $${cost.toLocaleString()}`;
+    const tone = full ? 'var(--muted)' : shortfall > 0 ? '#fbbf24' : 'var(--amber)';
+    const stateClass = full ? 'full' : shortfall > 0 || count === 0 ? 'low' : '';
+    const accessible = full
+      ? `${label}: cargo full, ${count} of ${capacity}`
+      : shortfall > 0
+        ? `${label}: ${count} of ${capacity}; costs $${cost}; need $${shortfall} more cash`
+        : `Restock ${label}: ${count} of ${capacity}; buy ${qty} for $${cost}`;
+    return `<button class="dw-stock-btn ${stateClass}" aria-label="${accessible}" title="${accessible}" onclick="buyStock('${type}')">
+      ${label}: <strong>${count}/${capacity}</strong><br><span style="color:${tone};">${status}</span>
     </button>`;
+  };
+  bar.innerHTML =
+    stockCard('plug', 'Plugs', state.plugs, rig.capPlugs, plugCost, plugQty, plugQty <= 0) +
+    stockCard('std', 'Std Tires', state.stdTires, rig.capStd, stdCost, 1, state.stdTires >= rig.capStd) +
+    stockCard('hd', 'HD Tires', state.hdTires, rig.capHd, hdCost, 1, state.hdTires >= rig.capHd);
 }
 
 function renderDispatchScanControl() {
