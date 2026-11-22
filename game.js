@@ -816,8 +816,8 @@ function claimContract() {
   state.parts += c.rewardPart || 0;
   state.rep += repWon;
   state.contractsCompleted = (state.contractsCompleted || 0) + 1;
-  // A measured career reward: one Gold Gear every fifth completed contract.
-  const contractCareerGear = state.contractsCompleted % 5 === 0 ? 1 : 0;
+  // A scarce career reward: one Gold Gear every sixth completed contract.
+  const contractCareerGear = state.contractsCompleted % 6 === 0 ? 1 : 0;
   if (contractCareerGear) state.parts += contractCareerGear;
   rollNewContract();
   saveState();
@@ -871,7 +871,7 @@ function renderContractBanner() {
         ${displayedContractCash} + ${c.rewardTokens}⚡${c.rewardPart ? ` + ${c.rewardPart}⚙️` : ''}
       </strong>
     </div>
-    <div class="contract-career-rank"><span>CAREER CONTRACTS COMPLETED</span><strong>${state.contractsCompleted || 0}</strong><em>Next reward bonus: +${Math.min(30,Math.floor(((state.contractsCompleted||0)+1)/2)*5)}% · Next Gear: ${5-((state.contractsCompleted||0)%5)} contracts</em></div>
+    <div class="contract-career-rank"><span>CAREER CONTRACTS COMPLETED</span><strong>${state.contractsCompleted || 0}</strong><em>Next reward bonus: +${Math.min(30,Math.floor(((state.contractsCompleted||0)+1)/2)*5)}% · Next Gear: ${6-((state.contractsCompleted||0)%6)} contracts</em></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px;">
       <strong style="font-size:14px;">${c.title}</strong>
       <span style="font-size:12px;font-weight:800;color:${ready ? 'var(--green)' : 'var(--muted)'};">${c.progress}/${c.target}</span>
