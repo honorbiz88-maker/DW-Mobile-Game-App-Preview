@@ -131,13 +131,12 @@ test('a deliberate cloud restore survives reload without reopening the same conf
   const restore = cloudSource.slice(restoreStart, restoreEnd);
   assert.match(restore, /RESTORE_MARKER_KEY/);
   assert.match(restore, /revision: cloudRevision/);
-  assert.match(restore, /cloudPayload: pending\.cloudData\.payload/);
+  assert.match(restore, /uid: currentUser\.uid/);
   const reconcileStart = cloudSource.indexOf('async function reconcile(user)');
   const reconcileEnd = cloudSource.indexOf('async function keepLocal()', reconcileStart);
   const reconcile = cloudSource.slice(reconcileStart, reconcileEnd);
   assert.match(reconcile, /restoreMarker\?\.uid === user\.uid/);
-  assert.match(reconcile, /restoreMarker\.revision === cloudRevision/);
-  assert.match(reconcile, /restoreMarker\.deviceId && cloud\.deviceId === restoreMarker\.deviceId/);
+  assert.match(reconcile, /local\?\.ownerUid === user\.uid/);
   assert.match(reconcile, /queueSave\(local\.payload\)/);
   assert.match(reconcile, /JSON\.stringify\(local\.payload\) === JSON\.stringify\(cloud\.payload\)/);
   assert.match(reconcile, /reconcilingUids\.has\(user\.uid\)/);
@@ -1599,6 +1598,30 @@ test('cloud restore marker survives reload without relying on Firestore timestam
   assert.equal(second.store.has('delwin_cloud_restore_pending'), false);
   assert.match(second.elements.get('cloud-account-status').textContent, /restored and connected/i);
   assert.deepEqual(JSON.parse(second.store.get('delwin_v4_save')), cloudCareer);
+});
+
+test('cloud restore marker survives boot normalization before cloud sync', async () => {
+  const cloudCareer = { cash: 120, jobsCompleted: 4 };
+  const normalizedLocalCareer = { cash: 120, jobsCompleted: 4, migrated: true };
+  const marker = { uid: 'account-B', revision: null, deviceId: 'test-device-id' };
+  const h = cloudModuleHarness({
+    local: {
+      delwin_v4_save: JSON.stringify(normalizedLocalCareer),
+      delwin_cloud_owner_uid: 'account-B',
+      delwin_cloud_restore_pending: JSON.stringify(marker)
+    },
+    cloud: {
+      'users/account-B/saves/current': {
+        schemaVersion: 1, payload: cloudCareer, updatedAt: {}, deviceId: 'other-device'
+      }
+    },
+    user: { uid: 'account-B', email: 'b@example.com' }
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.calls.modal, '', 'A pending explicit restore must suppress the repeated conflict');
+  assert.equal(h.store.has('delwin_cloud_restore_pending'), true,
+    'Keep the marker until the normalized local career has synced');
+  assert.equal(h.timers.size > 0, true, 'Queue the normalized local career for cloud synchronization');
 });
 
 test('a fresh device restores a valid cloud career and records its account owner', async () => {
