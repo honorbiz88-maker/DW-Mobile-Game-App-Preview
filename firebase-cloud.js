@@ -44,6 +44,12 @@ function accountCard() {
   const signin = document.getElementById("cloud-signin");
   const reset = document.getElementById("cloud-reset");
   const signout = document.getElementById("cloud-signout");
+  const diagnose = document.getElementById("cloud-diagnose");
+  diagnose?.addEventListener("click", async () => {
+    status("Testing the Firebase Auth endpoint directly…");
+    const result = await diagnoseAuthApiKey();
+    status(result, /rejected|could not complete/i.test(result));
+  });
   create?.addEventListener("click", async () => {
     const { email, password } = credentials();
     if (!email || password.length < 6) return status("Enter a valid email and a password of at least 6 characters.", true);
