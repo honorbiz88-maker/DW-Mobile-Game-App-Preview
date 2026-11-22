@@ -1605,7 +1605,7 @@ test('cloud restore marker survives reload without relying on Firestore timestam
 test('gameplay save routine defers local writes while an accepted cloud restore is pending', () => {
   const start = source.indexOf('function saveState()');
   const end = source.indexOf('function syncPoolRecharge', start);
-  const save = gameSource.slice(start, end);
+  const save = source.slice(start, end);
   assert.match(save, /DelWinCloud\?\.isRestorePending\?\.\(\)\) return/);
   assert.ok(save.indexOf('isRestorePending') < save.indexOf("localStorage.setItem('delwin_v4_save'"),
     'The restore guard must run before any local save write');
