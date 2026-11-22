@@ -1457,10 +1457,10 @@ function renderJobs() {
         </div>
         <div class="dispatch-net-breakdown" style="display:flex;flex-wrap:wrap;gap:6px 12px;padding:7px 9px;margin:5px 0;background:rgba(15,23,42,.42);border-radius:7px;font-size:10px;color:var(--muted);">
           <span>Gross if accepted now: <strong style="color:var(--text);">${Math.round(grossEstimate)}</strong></span>
-          <span>Supply reserve: <strong style="color:var(--text);">−${Math.round(supplyCost)}</strong></span>
-          <span>Operating overhead: <strong style="color:var(--text);">−${Math.round(overhead)}</strong></span>
+          <span>Supply reserve (not deducted from payout): <strong style="color:var(--text);">−${Math.round(supplyCost)}</strong></span>
+          <span>Operating overhead (deducted): <strong style="color:var(--text);">−${Math.round(overhead)}</strong></span>
           <span>Fast-finish bonus if eligible: <strong style="color:var(--green);">+${fastBonusEstimate}</strong></span>
-          <span style="width:100%;font-size:9px;">Net estimate excludes the conditional fast-finish bonus and any penalties. Surge applies only to the next call you accept.</span>
+          <span style="width:100%;font-size:9px;">Estimated cash after overhead and supply reserve: ${Math.round(projected)}. Supplies are paid separately when restocked. Fast bonus is conditional; penalties may reduce payout. Surge applies only to the next accepted call.</span>
         </div>
         <div class="job-meta">
           <span>🛞 ${heavy ? 'HD Tire' : 'Std Tire'} · ${j.veh.targetPsi} PSI${hazardBadge}${lockBadge}</span>
