@@ -1601,7 +1601,7 @@ function toggleBayFloodlights() {
 
 function applyWheelLockKey() {
   const job = state.activeJob;
-  if (!job || !job.hasWheelLock || job.lockKeyApplied) return;
+  if (!job || job.step !== 2 || !job.hasWheelLock || job.lockKeyApplied) return;
   job.lockKeyApplied = true;
   dismissAlert();
   SoundFX.torqueClick();
@@ -1985,7 +1985,7 @@ function applyPsiTick(delta) {
 
 function setCones() {
   const job = state.activeJob;
-  if (!job || job.conesSet) return;
+  if (!job || job.step !== 1 || job.conesSet) return;
   job.conesSet = true;
   job.lastSpunLug = null;
   dismissAlert();
@@ -1995,7 +1995,7 @@ function setCones() {
 
 function setChocks() {
   const job = state.activeJob;
-  if (!job) return;
+  if (!job || job.step !== 1 || job.chocked) return;
   if (!job.conesSet) {
     addBayPenalty(job, 10, 'DOT Safety Violation: Worked shoulder without traffic cones', 5);
     showAlert('DOT CONE ALERT (-$10 / -5 REP)', 'Deploy reflective highway traffic cones before chocking or lifting on the shoulder!');
@@ -2012,7 +2012,7 @@ function setChocks() {
 
 function pumpJack() {
   const job = state.activeJob;
-  if (!job) return;
+  if (!job || job.step !== 1 || job.liftPct >= 100) return;
   if (!job.conesSet) {
     addBayPenalty(job, 10, 'DOT Safety Violation: Lifted without traffic cones', 5);
     showAlert('DOT CONE ALERT (-$10 / -5 REP)', 'Deploy highway traffic cones first to protect your roadside bay!');
@@ -2045,7 +2045,8 @@ function triggerLugSpin(job, id) {
 
 function tapLug(id) {
   const job = state.activeJob;
-  if (!job) return;
+  if (!job || !Number.isInteger(id) || id < 1 || id > 5) return;
+  if (job.step !== 2 && job.step !== 5) return;
   const w = job.weather || WEATHER_CONDITIONS[0];
 
   if (job.step === 1) {
@@ -2108,7 +2109,7 @@ function tapLug(id) {
 
 function lowerJackAndFinish() {
   const job = state.activeJob;
-  if (!job || job.step !== 5 || job.torqueIdx < 5 || job.jackLowered) return;
+  if (!job || job.step !== 5 || job.torqueIdx !== 5 || !job.fixed || job.jackLowered) return;
   job.jackLowered = true;
   SoundFX.jack();
   renderBay();
@@ -2119,7 +2120,7 @@ function lowerJackAndFinish() {
 
 function runScan() {
   const job = state.activeJob;
-  if (!job) return;
+  if (!job || job.step !== 3 || job.scanned) return;
   job.lastSpunLug = null;
   SoundFX.scan();
   job.scanned = true;
@@ -2128,7 +2129,8 @@ function runScan() {
 
 function performRepair(choice) {
   const job = state.activeJob;
-  if (!job) return;
+  if (!job || job.step !== 3 || !job.scanned || job.fixed) return;
+  if (choice !== 'plug' && choice !== 'swap') return;
   job.lastSpunLug = null;
 
   if (job.dmg.action === 'plug' && choice !== 'plug') {
@@ -2186,7 +2188,11 @@ function performRepair(choice) {
 
 function droneDrop() {
   const job = state.activeJob;
-  if (!job) return;
+  if (!job || job.step !== 3 || !job.scanned || job.fixed) return;
+  if (job.veh.heavy ? state.hdTires > 0 : state.stdTires > 0) {
+    showAlert('EMERGENCY DROP NOT NEEDED', 'Use the tire already in your inventory before ordering an emergency drone drop.');
+    return;
+  }
   const cost = job.veh.heavy ? 5 : 3;
   if (state.tokens < cost) {
     showAlert('INSUFFICIENT TOKENS', `Drone ${job.veh.heavy ? 'Heavy-Duty' : 'Standard'} Tire Drop costs ${cost} ⚡.`);
@@ -2203,7 +2209,7 @@ function droneDrop() {
 
 function lockPsi() {
   const job = state.activeJob;
-  if (!job) return;
+  if (!job || job.step !== 4 || !job.fixed) return;
   job.lastSpunLug = null;
   const t = job.veh.targetPsi;
   const tol = 2 + Math.floor((state.tools.comp.level - 1) / 8);
