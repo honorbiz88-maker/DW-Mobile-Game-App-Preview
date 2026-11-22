@@ -300,6 +300,9 @@ function loadState() {
 
 function saveState() {
   try {
+    // During an accepted cloud restore, Firebase owns the save decision.
+    // Do not let startup normalization or boot-time mutations overwrite it.
+    if (window.DelWinCloud?.isRestorePending?.()) return;
     localStorage.setItem('delwin_v4_save', JSON.stringify(state));
     if (window.DelWinCloud && typeof window.DelWinCloud.queueSave === 'function') {
       window.DelWinCloud.queueSave(state);
