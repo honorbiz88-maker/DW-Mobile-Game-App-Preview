@@ -209,14 +209,19 @@ function keepCloud() {
     status(`Could not restore cloud career: ${error.message}`, true);
   }
 }
+function pendingBelongsToUser(pending, user) {
+  return !!pending && !!user && pending.uid === user.uid;
+}
 function queueSave(payload) {
   if (!currentUser || !syncReady || busy || !navigator.onLine) return;
-  pendingPayload = JSON.parse(JSON.stringify(payload));
+  const queuedUid = currentUser.uid;
+  pendingPayload = { uid: queuedUid, payload: JSON.parse(JSON.stringify(payload)) };
   clearTimeout(syncTimer);
   syncTimer = setTimeout(async () => {
-    if (!currentUser || !syncReady || !pendingPayload) return;
-    const next = pendingPayload;
+    if (!pendingBelongsToUser(pendingPayload, currentUser) || currentUser.uid !== queuedUid || !syncReady) return;
+    const next = pendingPayload.payload;
     pendingPayload = null;
+    syncTimer = null;
     try {
       await writeCloud(next);
       status("Cloud save synced.");
