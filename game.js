@@ -55,11 +55,11 @@ const HUB_TIERS = [
 
 const RIG_TIERS = [
   { tier: 1, name: 'Tier 1: Novice Roadside Van', img: 'assets/rig-t1.png', color: '#cbd5e1', reqLvl: 1, req: 'Starting Rig', cashCost: 0, partCost: 0, tokenCost: 0, mult: 1.00, capPlugs: 6, capStd: 3, capHd: 1, perk: 'Standard highway response rig (1.00x Payouts).' },
-  { tier: 2, name: 'Tier 2: Intermediate Utility Pickup', img: 'assets/rig-t2.png', color: '#38bdf8', reqLvl: 5, req: 'All Tools Lvl 5+', cashCost: 2200, partCost: 2, tokenCost: 0, mult: 1.12, capPlugs: 9, capStd: 4, capHd: 2, perk: '1.12x Base Payouts & Twin Amber Strobes.' },
-  { tier: 3, name: 'Tier 3: Pro Extended Tire Truck', img: 'assets/rig-t3.png', color: '#f59e0b', reqLvl: 9, req: 'All Tools Lvl 9+', cashCost: 9500, partCost: 4, tokenCost: 0, mult: 1.25, capPlugs: 12, capStd: 6, capHd: 3, perk: '1.25x Base Payouts & Exterior Spare Tire Rack.' },
-  { tier: 4, name: 'Tier 4: Commercial Dually Rig', img: 'assets/rig-t4.png', color: '#a855f7', reqLvl: 13, req: 'All Tools Lvl 13+', cashCost: 36000, partCost: 8, tokenCost: 0, mult: 1.40, capPlugs: 16, capStd: 8, capHd: 4, perk: '1.40x Base Payouts & Dual-Wheel Hydraulic Lift.' },
-  { tier: 5, name: 'Tier 5: Heavy-Duty Fleet Rescue Box', img: 'assets/rig-t5.png', color: '#ef4444', reqLvl: 17, req: 'All Tools Lvl 17+', cashCost: 135000, partCost: 14, tokenCost: 0, mult: 1.56, capPlugs: 22, capStd: 10, capHd: 6, perk: '1.56x Base Payouts & Commercial Fleet Priority.' },
-  { tier: 6, name: 'Tier 6: Master Apex Syndicate Flagship', img: 'assets/rig-t6.png', color: '#fde047', reqLvl: 21, req: 'All Tools Lvl 21+', cashCost: 450000, partCost: 22, tokenCost: 0, mult: 1.74, capPlugs: 30, capStd: 14, capHd: 8, perk: '1.74x Base Payouts & Maximum Corridor Prestige.' }
+  { tier: 2, name: 'Tier 2: Intermediate Utility Pickup', img: 'assets/rig-t2.png', color: '#38bdf8', reqLvl: 5, req: 'All Tools Lvl 5+', cashCost: 2200, partCost: 1, tokenCost: 0, mult: 1.12, capPlugs: 9, capStd: 4, capHd: 2, perk: '1.12x Base Payouts & Twin Amber Strobes.' },
+  { tier: 3, name: 'Tier 3: Pro Extended Tire Truck', img: 'assets/rig-t3.png', color: '#f59e0b', reqLvl: 9, req: 'All Tools Lvl 9+', cashCost: 9500, partCost: 2, tokenCost: 0, mult: 1.25, capPlugs: 12, capStd: 6, capHd: 3, perk: '1.25x Base Payouts & Exterior Spare Tire Rack.' },
+  { tier: 4, name: 'Tier 4: Commercial Dually Rig', img: 'assets/rig-t4.png', color: '#a855f7', reqLvl: 13, req: 'All Tools Lvl 13+', cashCost: 36000, partCost: 3, tokenCost: 0, mult: 1.40, capPlugs: 16, capStd: 8, capHd: 4, perk: '1.40x Base Payouts & Dual-Wheel Hydraulic Lift.' },
+  { tier: 5, name: 'Tier 5: Heavy-Duty Fleet Rescue Box', img: 'assets/rig-t5.png', color: '#ef4444', reqLvl: 17, req: 'All Tools Lvl 17+', cashCost: 135000, partCost: 4, tokenCost: 0, mult: 1.56, capPlugs: 22, capStd: 10, capHd: 6, perk: '1.56x Base Payouts & Commercial Fleet Priority.' },
+  { tier: 6, name: 'Tier 6: Master Apex Syndicate Flagship', img: 'assets/rig-t6.png', color: '#fde047', reqLvl: 21, req: 'All Tools Lvl 21+', cashCost: 450000, partCost: 5, tokenCost: 0, mult: 1.74, capPlugs: 30, capStd: 14, capHd: 8, perk: '1.74x Base Payouts & Maximum Corridor Prestige.' }
 ];
 
 const ZONES = [
@@ -423,16 +423,16 @@ function getToolUpgradeSpec(key) {
   const roundStep = rawCost >= 50000 ? 500 : rawCost >= 10000 ? 100 : rawCost >= 1000 ? 50 : 10;
   const cost = Math.round(rawCost / roundStep) * roundStep;
 
-  // Gold Gear breakthrough costs scaled to the faster 3-call streak + 9/15 milestone earn rate:
-  // Lvl 4->5 (Tier 2): 2 ⚙️ | Lvl 8->9 (Tier 3): 4 ⚙️ | Lvl 12->13 (Tier 4): 8 ⚙️ | Lvl 16->17 (Tier 5): 12 ⚙️ | Lvl 20->21 (Tier 6): 16 ⚙️
+  // Gold Gear costs are milestone-based and intentionally attainable through play.
+  // Across four tools, the five major breakthroughs cost 60 Gears total.
   let gears = 0;
   if (isBreakthrough) {
-    if (lvl === 4) gears = 2;
-    else if (lvl === 8) gears = 4;
-    else if (lvl === 12) gears = 8;
-    else if (lvl === 16) gears = 12;
-    else if (lvl === 20) gears = 16;
-    else gears = Math.min(18, Math.floor(lvl / 2) + 2);
+    if (lvl === 4) gears = 1;
+    else if (lvl === 8) gears = 2;
+    else if (lvl === 12) gears = 3;
+    else if (lvl === 16) gears = 4;
+    else if (lvl === 20) gears = 5;
+    else gears = Math.min(6, Math.floor(lvl / 4) + 1);
   }
   return { cost, gears, isBreakthrough, tierIndex };
 }
