@@ -1948,8 +1948,14 @@ function updateLivePsiMeter(job) {
 }
 
 function startHoldPsi(deltaPerTick) {
+  const job = state.activeJob;
+  if (!job || job.step !== 4 || !Number.isFinite(deltaPerTick) || deltaPerTick === 0) {
+    stopHoldPsi();
+    return;
+  }
   stopHoldPsi();
   applyPsiTick(deltaPerTick);
+  if (!state.activeJob || state.activeJob !== job || job.step !== 4) return;
   holdPsiInterval = setInterval(() => {
     applyPsiTick(deltaPerTick);
   }, 115);
@@ -1960,6 +1966,15 @@ function stopHoldPsi() {
     clearInterval(holdPsiInterval);
     holdPsiInterval = null;
   }
+}
+
+// Stop continuous PSI input if the app loses focus or is backgrounded.
+if (typeof window !== 'undefined' && !window.__delwinPsiFocusGuard) {
+  window.__delwinPsiFocusGuard = true;
+  window.addEventListener('blur', stopHoldPsi);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stopHoldPsi();
+  });
 }
 
 function applyPsiTick(delta) {
