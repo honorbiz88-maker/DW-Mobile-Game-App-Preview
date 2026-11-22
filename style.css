@@ -898,3 +898,12 @@ button, .lug-btn, .hud-pill-compact {
 .dispatch-prep-note.ready{color:#86efac;background:rgba(16,185,129,.09);border:1px solid rgba(16,185,129,.22)}
 .dispatch-prep-note.warning{color:#fbbf24;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.28)}
 .dispatch-intel-card .primary-btn:disabled{opacity:.55;filter:saturate(.45)}
+
+
+/* Garage commissioning comparison */
+.rig-upgrade-intel{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px 0}
+.rig-upgrade-stat{display:flex;flex-direction:column;gap:3px;padding:10px;background:rgba(4,11,20,.68);border:1px solid rgba(130,160,190,.2);border-radius:10px}
+.rig-upgrade-stat span{font-size:9px;letter-spacing:.65px;font-weight:900;color:var(--muted)}
+.rig-upgrade-stat strong{font-size:20px;color:var(--amber);font-variant-numeric:tabular-nums}
+.rig-upgrade-stat small{font-size:10px;color:var(--muted)}
+.rig-upgrade-status{padding:8px 10px;margin:6px 0 8px;border-radius:8px;background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.2);font-size:11px;font-weight:750;color:#bae6fd}
