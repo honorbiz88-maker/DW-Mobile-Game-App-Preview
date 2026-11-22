@@ -372,6 +372,23 @@ function getStockPricing() {
   };
 }
 
+function getSupplyReplacementCost(job) {
+  if (!job || !job.dmg) return 0;
+  const rig = getActiveRigObj();
+  const pricing = getStockPricing();
+  if (job.dmg.action === 'plug') {
+    // Estimate the actual marginal restock cost after this call consumes one kit.
+    // Small remaining cargo space can force a partial pack, which costs more per kit.
+    const remainingAfterUse = Math.max(0, (Number(state.plugs) || 0) - 1);
+    const availableSpace = Math.max(0, rig.capPlugs - remainingAfterUse);
+    const restockQty = Math.min(pricing.plugPackQty, availableSpace);
+    if (restockQty <= 0) return 0;
+    const restockCost = Math.ceil(pricing.plugPackCost * restockQty / pricing.plugPackQty);
+    return restockCost / restockQty;
+  }
+  return job.veh && job.veh.heavy ? pricing.hdCost : pricing.stdCost;
+}
+
 function getFleetOverheadFee(job) {
   // Once a dispatch is generated, preserve its quoted operating overhead.
   // This keeps the job invoice stable if the player later changes territory or rig.
@@ -1303,11 +1320,9 @@ function renderJobs() {
       ? (heavy ? state.hdTires > 0 : state.stdTires > 0)
       : state.plugs > 0;
     const overhead = getFleetOverheadFee(j);
-    const stockPricing = getStockPricing();
-    const supplyCost = j.dmg.action === 'plug'
-      ? stockPricing.plugPackCost / stockPricing.plugPackQty
-      : (heavy ? stockPricing.hdCost : stockPricing.stdCost);
-    // This estimate includes the consumed supply, but excludes performance bonuses and penalties.
+    const supplyCost = getSupplyReplacementCost(j);
+    // This estimate includes the actual marginal restock cost of the consumed supply,
+    // but excludes performance bonuses and penalties.
     const projected = Math.max(0, j.pay * (state.surgeJobs > 0 ? 2 : 1) - overhead - supplyCost);
     const risk = (j.isRusted ? 2 : 0) + (j.hasWheelLock ? 1 : 0) + (w.id === 'rain' || w.id === 'night' ? 1 : 0) + (heavy ? 1 : 0) + (j.vip ? 2 : 0);
     const riskLabel = risk >= 5 ? 'HIGH RISK' : risk >= 3 ? 'MODERATE' : 'ROUTINE';
