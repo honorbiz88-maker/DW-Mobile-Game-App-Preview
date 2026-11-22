@@ -234,13 +234,12 @@ async function reconcile(user) {
     let restoreMarker = null;
     try { restoreMarker = JSON.parse(localStorage.getItem(RESTORE_MARKER_KEY) || "null"); } catch {}
     const cloudRevision = cloud.updatedAt?.toMillis ? cloud.updatedAt.toMillis() : null;
-    const markerPayloadMatchesCloud = !!restoreMarker?.cloudPayload
-      && JSON.stringify(restoreMarker.cloudPayload) === JSON.stringify(cloud.payload);
+    // The marker records an explicit player choice to use this account's cloud
+    // career. Its UID + local owner are the authority; payloads, timestamps, and
+    // device IDs can legitimately differ after game boot normalization or legacy
+    // Firestore reads. Do not reopen the same conflict while that choice is pending.
     const markerStillOwnsCloud = restoreMarker?.uid === user.uid
-      && local?.ownerUid === user.uid
-      && (markerPayloadMatchesCloud
-        || (cloudRevision !== null && restoreMarker.revision === cloudRevision)
-        || (restoreMarker.deviceId && cloud.deviceId === restoreMarker.deviceId));
+      && local?.ownerUid === user.uid;
     if (markerStillOwnsCloud) {
       syncReady = true;
       if (JSON.stringify(local.payload) === JSON.stringify(cloud.payload)) {
