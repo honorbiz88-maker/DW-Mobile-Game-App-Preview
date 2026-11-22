@@ -197,10 +197,14 @@ async function reconcile(user) {
     // guard; game boot/migration can briefly rewrite local save metadata on reload.
     let restoreMarker = null;
     try { restoreMarker = JSON.parse(localStorage.getItem(RESTORE_MARKER_KEY) || "null"); } catch {}
-    if (snap.exists() && restoreMarker?.uid === user.uid) {
-      const restoreCloud = snap.data();
-      if (restoreCloud?.schemaVersion === SCHEMA_VERSION && restoreCloud.payload && typeof restoreCloud.payload === "object" && !Array.isArray(restoreCloud.payload)) {
-        const cloudPayload = JSON.stringify(restoreCloud.payload);
+    if (restoreMarker?.uid === user.uid) {
+      // Restore the exact cloud snapshot the player selected. Do not silently
+      // switch to a newer Firestore revision during the reload handshake.
+      const selectedPayload = restoreMarker.cloudPayload && typeof restoreMarker.cloudPayload === "object" && !Array.isArray(restoreMarker.cloudPayload)
+        ? restoreMarker.cloudPayload
+        : (snap.exists() ? snap.data()?.payload : null);
+      if (selectedPayload && typeof selectedPayload === "object" && !Array.isArray(selectedPayload)) {
+        const cloudPayload = JSON.stringify(selectedPayload);
         const localMatchesCloud = !!local && JSON.stringify(local.payload) === cloudPayload;
         localStorage.setItem(OWNER_KEY, user.uid);
         if (!localMatchesCloud) {
