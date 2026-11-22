@@ -1603,6 +1603,15 @@ test('cloud restore marker survives reload without relying on Firestore timestam
   assert.deepEqual(JSON.parse(second.store.get('delwin_v4_save')), cloudCareer);
 });
 
+test('restore guard remains active before Firebase restores the signed-in session', () => {
+  const start = cloudSource.indexOf('function isRestorePending()');
+  const end = cloudSource.indexOf('window.DelWinCloud =', start);
+  const guard = cloudSource.slice(start, end);
+  assert.match(guard, /localStorage\.getItem\(RESTORE_MARKER_KEY\)/);
+  assert.match(guard, /return !!marker\?\.uid && \(!currentUser \|\| marker\.uid === currentUser\.uid\)/);
+  assert.doesNotMatch(guard, /if \(!currentUser\) return false/);
+});
+
 test('gameplay save routine defers local writes while an accepted cloud restore is pending', () => {
   const start = source.indexOf('function saveState()');
   const end = source.indexOf('function syncPoolRecharge', start);
