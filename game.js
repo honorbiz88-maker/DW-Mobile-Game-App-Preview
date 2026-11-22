@@ -2731,6 +2731,7 @@ function renderGarage() {
   if (!previewRigTier) previewRigTier = activeRigTier;
   const rig = RIG_TIERS[previewRigTier - 1];
   const isUnlocked = previewRigTier <= (state.unlockedRigTier || 1);
+  const isNextRig = previewRigTier === (state.unlockedRigTier || 1) + 1;
   const meetsTools = getMinToolLevel() >= rig.reqLvl;
   const currentHub = getCurrentHubTier();
   const activeRig = RIG_TIERS[activeRigTier - 1];
@@ -2738,9 +2739,11 @@ function renderGarage() {
   const cargoDelta = (rig.capStd + rig.capHd + rig.capPlugs) - (activeRig.capStd + activeRig.capHd + activeRig.capPlugs);
   const rigStatusLine = isUnlocked
     ? 'This rig is already in your commissioned fleet.'
-    : previewRigTier === (state.unlockedRigTier + 1)
-      ? 'Next available fleet commission.'
-      : `Unlock Tier ${state.unlockedRigTier + 1} first to continue your fleet progression.`;
+    : !isNextRig
+      ? `Unlock Tier ${state.unlockedRigTier + 1} first to continue your fleet progression.`
+      : !meetsTools
+        ? `Upgrade all four tools to Level ${rig.reqLvl}+ to unlock this commission.`
+        : 'Next rig in sequence · requirements satisfied; ready for commission.';
 
   const garagePage = document.getElementById('page-garage');
   let heroCard = garagePage.querySelector('.rig-hero');
@@ -2754,7 +2757,7 @@ function renderGarage() {
   heroCard.innerHTML = `
     <div class="rig-hero-top" style="display:flex;justify-content:space-between;align-items:center;">
       <div>
-        <span class="badge">${isUnlocked ? 'COMMISSIONED FLEET RIG' : meetsTools ? 'READY TO COMMISSION' : `REQUIRES ${rig.req.toUpperCase()}`}</span>
+        <span class="badge">${isUnlocked ? 'COMMISSIONED FLEET RIG' : !isNextRig ? `SEQUENCE LOCKED · TIER ${state.unlockedRigTier + 1} FIRST` : meetsTools ? 'READY TO COMMISSION' : `REQUIRES ${rig.req.toUpperCase()}`}</span>
         <h3 style="font-size:15px;margin-top:4px;">${rig.name}</h3>
       </div>
       <div class="carousel-nav">
@@ -2787,9 +2790,11 @@ function renderGarage() {
       onclick="purchaseRigTier(${previewRigTier})">
       ${isUnlocked
         ? `✓ ACTIVE FLEET RIG (${rig.mult.toFixed(2)}x PAYOUTS)`
-        : meetsTools
-          ? `COMMISSION RIG: ${rig.cashCost.toLocaleString()} + ${rig.partCost} ⚙️`
-          : `LOCKED · ALL TOOLS LVL ${rig.reqLvl}+ (${rig.cashCost.toLocaleString()} + ${rig.partCost}⚙️)`}
+        : !isNextRig
+          ? `LOCKED · COMMISSION TIER ${state.unlockedRigTier + 1} FIRST`
+          : !meetsTools
+            ? `LOCKED · ALL TOOLS LVL ${rig.reqLvl}+ (${rig.cashCost.toLocaleString()} + ${rig.partCost}⚙️)`
+            : `COMMISSION RIG: ${rig.cashCost.toLocaleString()} + ${rig.partCost} ⚙️`}
     </button>
   `;
 
@@ -2844,7 +2849,7 @@ function upgradeTool(key) {
     return;
   }
   if (reqGears > 0 && state.parts < reqGears) {
-    showAlert('GOLD GEARS REQUIRED', `Hub Tier breakthrough upgrades (Lvl ${tool.level}→${tool.level + 1}) require ${reqGears} ⚙️ Gold Gear${reqGears > 1 ? 's' : ''} from 3-call clean streaks, 9/15 streak milestones, Contracts, or the Shop.`);
+    showAlert('GOLD GEARS REQUIRED', `Tool breakthrough upgrades (Lvl ${tool.level}→${tool.level + 1}) require ${reqGears} ⚙️ Gold Gear${reqGears > 1 ? 's' : ''}. Earn Gears through clean-call streaks, career milestones, and contracts.`);
     return;
   }
   state.cash -= cost;
