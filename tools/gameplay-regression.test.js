@@ -494,7 +494,7 @@ test('wheel lugs reject early work, missing night lights, and unsecured lock lug
   const state = { activeJob:job, tools:{impact:{level:1}} };
   const alerts=[];
   const addBayPenalty=(j,cash,reason,rep)=>{if(!j.penaltyLog.some(x=>x.reason===reason)){j.penalties+=cash;j.repPenalties+=rep;j.penaltyLog.push({reason});}};
-  const tap=gameFunction('tapLug',{state,WEATHER_CONDITIONS:[{id:'clear'}],STAR_ORDER:[1,3,5,2,4],addBayPenalty,showAlert:(t)=>alerts.push(t),showBayActionHint:()=>{},renderBay:()=>{},SoundFX:{error:()=>{},impact:()=>{},torqueClick:()=>{}},triggerLugSpin:()=>{},Math:{random:()=>1,floor:Math.floor,max:Math.max}});
+  const tap=gameFunction('tapLug',{state,WEATHER_CONDITIONS:[{id:'clear'}],STAR_ORDER:[1,3,5,2,4],addBayPenalty,showAlert:(t)=>alerts.push(t),showBayActionHint:()=>{},renderBay:()=>{},SoundFX:{error:()=>{},impact:()=>{},torqueClick:()=>{}},triggerLugSpin:()=>{},Math:{random:()=>1,floor:Math.floor,max:Math.max,min:Math.min}});
   tap(1);
   assert.equal(job.penalties,10);
   job.step=2;
