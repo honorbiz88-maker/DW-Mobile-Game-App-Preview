@@ -1536,32 +1536,31 @@ function skipTutorial() {
 
 function getTutorialCoaching(job) {
   if (job.step === 1 && !job.conesSet) {
-    return { stepLabel: 'TRAINING 1/8', text: 'Tap 1. SET CONES first to secure your highway shoulder perimeter.' };
+    return { step: 1, action: 'Place the traffic cones', detail: 'Protect the work area before touching the vehicle.' };
   }
   if (job.step === 1 && !job.chocked) {
-    return { stepLabel: 'TRAINING 2/8', text: 'Tap 2. CHOCKS next to lock the opposite wheels before jacking.' };
+    return { step: 2, action: 'Set the wheel chocks', detail: 'Secure the opposite wheels so the vehicle cannot roll.' };
   }
-  if (job.step === 1 && job.chocked) {
-    return { stepLabel: 'TRAINING 3/8', text: 'Tap 3. PUMP JACK to raise the hydraulic lift arm and vehicle body.' };
+  if (job.step === 1) {
+    return { step: 3, action: 'Raise the hydraulic jack', detail: 'Pump until the lift reaches 100% before removing any lugs.' };
   }
   if (job.step === 2) {
-    return { stepLabel: 'TRAINING 4/8', text: 'Tap each of the 5 glowing lug nuts directly on the wheel hub to spin them off.' };
+    return { step: 4, action: 'Remove all five wheel lugs', detail: 'Tap the glowing lug nuts on the hub. The wheel comes off after all five.' };
   }
   if (job.step === 3 && !job.scanned) {
-    return { stepLabel: 'TRAINING 5/8', text: 'Tap SCAN TIRE TREAD & SIDEWALL to inspect the damage.' };
+    return { step: 5, action: 'Scan the tire', detail: 'Inspect the tread and sidewall before choosing a repair.' };
   }
-  if (job.step === 3 && job.scanned) {
-    return { stepLabel: 'TRAINING 5/8', text: 'Center-tread nail detected! Tap PLUG PUNCTURE (never swap a center nail).' };
+  if (job.step === 3) {
+    return { step: 5, action: 'Plug the center-tread puncture', detail: 'This center-tread nail is repairable with a plug. A full tire swap is not needed.' };
   }
   if (job.step === 4) {
-    return { stepLabel: 'TRAINING 6/8', text: 'Press & HOLD INFLATE into the green 33–37 PSI target band, then tap LOCK PRESSURE.' };
+    return { step: 6, action: 'Set the correct tire pressure', detail: 'Hold Inflate in the green 33–37 PSI band, then lock pressure.' };
   }
   if (job.step === 5 && job.torqueIdx < 5) {
-    return { stepLabel: 'TRAINING 7/8', text: `Tap Lug #${STAR_ORDER[job.torqueIdx]} directly on the wheel hub (Star Order: 1→3→5→2→4).` };
+    return { step: 7, action: `Torque lug #${STAR_ORDER[job.torqueIdx]} next`, detail: 'Follow the star pattern: 1 → 3 → 5 → 2 → 4.' };
   }
-  return { stepLabel: 'TRAINING 8/8', text: 'Tap LOWER JACK & STOW CONES to drop the rig and close the call!' };
+  return { step: 8, action: 'Lower the jack and stow the cones', detail: 'Release the vehicle only after all five lugs are torqued.' };
 }
-
 function addBayPenalty(job, cashAmt, reason, repAmt = null) {
   if (!job || job.isTutorial) return;
   if (!job.penaltyLog) job.penaltyLog = [];
@@ -1690,13 +1689,21 @@ function renderBay() {
   }
   if (job.isTutorial) {
     const coach = getTutorialCoaching(job);
+    const progress = Math.round((coach.step / 8) * 100);
     tutEl.className = 'tut-banner';
+    tutEl.setAttribute('role', 'status');
+    tutEl.setAttribute('aria-live', 'polite');
     tutEl.innerHTML = `
       <div class="tut-banner-top">
-        <span class="badge">${coach.stepLabel} · REWARD: +12 ⚡</span>
-        <button class="ghost-btn" style="padding:3px 8px;font-size:11px;" onclick="skipTutorial()">Skip</button>
+        <span class="tut-stage-label">GUIDED TRAINING · ${coach.step} OF 8</span>
+        <span class="tut-reward">+12 ⚡ TRAINING REWARD</span>
+        <button class="ghost-btn tut-skip-btn" onclick="skipTutorial()" aria-label="Skip guided training">Skip</button>
       </div>
-      <p>${coach.text}</p>`;
+      <div class="tut-progress-track" role="progressbar" aria-label="Training progress" aria-valuemin="0" aria-valuemax="8" aria-valuenow="${coach.step}">
+        <div class="tut-progress-fill" style="width:${progress}%;"></div>
+      </div>
+      <p class="tut-action">${coach.action}</p>
+      <p class="tut-detail">${coach.detail}</p>`;
   } else {
     tutEl.className = 'hidden';
   }
