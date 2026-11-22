@@ -5,6 +5,10 @@
 // Run: node tools/simulate-gold-gears.js
 // This intentionally does not model cash, REP, inventory, or individual bay mistakes.
 
+const fs = require('node:fs');
+const path = require('node:path');
+const assert = require('node:assert/strict');
+
 const CAREER_AWARDS = new Map([[10, 1], [30, 2], [60, 2], [100, 3], [175, 3], [275, 4]]);
 const CONTRACTS = [
   { type: 'clean_streak', target: 4 },
@@ -14,6 +18,33 @@ const CONTRACTS = [
   { type: 'heavy', target: 2 }
 ];
 const HUB_GEAR_COST = [0, 0, 5, 10, 15, 20, 25];
+
+function verifyModelMatchesGame() {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'game.js'), 'utf8');
+  assert.ok(source.includes('const CLEAN_STREAK_GEAR_INTERVAL = 20;'), 'clean streak interval changed');
+  assert.ok(source.includes('const STREAK_GEAR_MILESTONES = { 20: 1 };'), 'streak reward table changed');
+  assert.ok(source.includes('state.contractsCompleted % 6 === 0 ? 1 : 0'), 'contract Gear interval changed');
+  assert.ok(source.includes('const careerGearAwards = {10:1,30:2,60:2,100:3,175:3,275:4};'), 'career milestone table changed');
+
+  const pool = source.match(/const CONTRACT_POOL = \[([\\s\\S]*?)\\n\\];/);
+  assert.ok(pool, 'could not locate contract pool');
+  const rewardParts = pool[1].match(/rewardPart: 0/g) || [];
+  assert.equal(rewardParts.length, 5, 'contract pool should contain five zero-direct-Gear rewards');
+  for (const id of ['c_clean4', 'c_plug3', 'c_swap3', 'c_fast3', 'c_heavy2']) {
+    assert.ok(pool[1].includes("id: '" + id + "'"), 'missing contract ' + id);
+  }
+
+  const rigs = source.match(/const RIG_TIERS = \[([\\s\\S]*?)\\n\\];/);
+  assert.ok(rigs, 'could not locate rig tiers');
+  for (const cost of [1, 2, 3, 4, 5]) {
+    assert.ok(rigs[1].includes('partCost: ' + cost), 'missing rig Gear cost ' + cost);
+  }
+  const upgrades = source.slice(source.indexOf('function getToolUpgradeSpec'), source.indexOf('function getToolEffectSummary'));
+  for (const rule of ['lvl === 4) gears = 1', 'lvl === 8) gears = 2', 'lvl === 12) gears = 3', 'lvl === 16) gears = 4', 'lvl === 20) gears = 5']) {
+    assert.ok(upgrades.includes(rule), 'missing tool breakthrough Gear rule: ' + rule);
+  }
+  console.log('Source alignment checks: PASS');
+}
 
 function mulberry32(seed) {
   return function random() {
@@ -156,6 +187,8 @@ const scenarios = [
   ['Rough', { cleanRate: 0.55, fastRate: 0.40, claimDelay: 2 }],
   ['Poor', { cleanRate: 0.35, fastRate: 0.30, claimDelay: 5 }]
 ];
+
+verifyModelMatchesGame();
 
 for (const [name, options] of scenarios) {
   console.log(JSON.stringify(summarize(name, options, 5000)));
