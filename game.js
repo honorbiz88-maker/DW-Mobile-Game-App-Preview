@@ -1042,7 +1042,7 @@ function triggerSurgeAction() {
 function activateFreeSurge() {
   syncSurgeRecharge();
   if (state.surgeCharges <= 0) {
-    showToast('No free Surge charges available.');
+    showAlert('SURGE RECHARGING', 'Your free Surge charges are depleted. They recharge automatically every 12 hours.');
     return;
   }
   if (state.surgeCharges === MAX_SURGE_CHARGES) {
