@@ -385,7 +385,16 @@ function queueSave(payload) {
   clearTimeout(syncTimer);
   syncTimer = setTimeout(() => flushPendingSave(queuedUid), 1400);
 }
-window.DelWinCloud = { queueSave, keepLocal, keepCloud, signOut: () => signOut(auth), hasAccount: () => !!currentUser, pendingConflict: null };
+function isRestorePending() {
+  if (!currentUser) return false;
+  try {
+    const marker = JSON.parse(localStorage.getItem(RESTORE_MARKER_KEY) || "null");
+    return marker?.uid === currentUser.uid;
+  } catch {
+    return false;
+  }
+}
+window.DelWinCloud = { queueSave, keepLocal, keepCloud, signOut: () => signOut(auth), hasAccount: () => !!currentUser, isRestorePending, pendingConflict: null };
 window.addEventListener("online", () => {
   if (currentUser) reconcile(currentUser);
 });
