@@ -77,28 +77,23 @@ Gold Gear demand is 60 for the five tool breakthroughs across four tools, plus 1
 
 The 20% early and 15% late discounts were present in the earlier Preview implementation. They were accidentally dropped when the duplicate initialization block was removed, because the copy containing those adjustments was deleted while the remaining function lacked them. The discounts have now been restored in the single active `getToolUpgradeSpec()` implementation.
 
-### Source-verified reward streams
+### Source-verified reward streams — revised 2026-11-22
 
-- Career call milestones award 15 Gold Gears total by 275 completed calls (1, 2, 2, 3, 3, and 4 at the configured milestones).
-- Clean streak awards occur at 3, 6, 9, 12, and 15 consecutive clean calls: 1, 1, 2, 1, and 3 Gears. The streak resets after the 15-call reward.
-- Contracts award 1 Gear on every fifth completed contract; the Fast and Heavy contract types each also award 1 Gear directly.
-- Contract rewards and dispatch overhead are snapshotted when offered. Heavy contracts are gated until Hub 2 and the Tier 2 rig are available.
+The previous reward structure was too generous. The source code was granting Gold Gears from three overlapping streams: frequent clean-streak drops, career call milestones, and both direct contract rewards and contract-completion milestones. The Preview implementation now uses a deliberately scarcer schedule:
 
-A renewal-reward calculation using the current streak rules estimates the following streak-only Gear yield per completed call. It assumes a constant independent clean-call probability and is a sensitivity model, not observed player telemetry:
+- Career call milestones remain one-time awards totaling **15 Gold Gears** by 275 completed calls (1, 2, 2, 3, 3, and 4 at the configured milestones).
+- Clean streaks now award **1 Gear only at 20 consecutive clean calls**. There are no Gear drops at 3, 6, 9, 12, or 15 calls. The streak resets after the 20-call reward.
+- Contract types no longer grant direct Gold Gears. The Fast and Heavy contract rewardPart values are now zero.
+- The contract-career milestone now grants **1 Gear every 6 completed contracts**, instead of every 5.
+- Existing player Gear balances are preserved. Previously earned Gears are not removed or reset; already-issued contracts in existing saves retain their promised reward, while newly issued contracts use the revised rewards.
+- Tool and rig Gear requirements remain unchanged at **75 total**. No new exchange, Gear purchase, or fake monetization flow has been added.
 
-| Clean-call rate | Expected streak Gears / call | Expected streak Gears over 275 calls |
-|---:|---:|---:|
-| 65% | 0.141 | 38.7 |
-| 75% | 0.208 | 57.3 |
-| 85% | 0.306 | 84.0 |
-| 92% | 0.399 | 109.6 |
-
-Career milestones add up to 15 more by call 275. Contract Gears are additional and depend on how quickly players complete and claim objectives. This makes clean performance and contract participation the main variables in Gear availability; do not tune Gear prices from the maximum-perfect-streak case alone.
+The new typical-play supply estimate is roughly 15 career Gears + about 55–60 contract milestone Gears across a 2,600-call career (assuming roughly one completed contract every 7–8 calls) + a small number of 20-clean-call streak rewards. That puts ordinary progression near the 75-Gear requirement rather than the previous large surplus. This is a pacing target, not a guarantee: contract completion and clean streak rates vary by player.
 
 ### Current conclusions
 
 - The verified full tool-plus-rig cash requirement is **$2,532,730** with the established discounts restored.
-- Clean-streak and career Gear rewards can supply the 75-Gear progression requirement for engaged players; contract rewards add further Gears. Low-clean-rate players need more contract participation. These are expected-value estimates, not observed player telemetry.
+- The revised Gear schedule is designed to put a typical player near the 75-Gear requirement over a full career, with the contract cadence as the main variable. Re-run the full progression simulation against the new reward schedule before treating the earlier max-progression call counts as current.
 - Rig maintenance now has a capped operating-overhead effect (0–20%) and service costs $1.50 per condition point restored. It is a modest operating incentive, not a hard failure gate.
 - Dispatch estimates subtract the estimated replacement cost of the consumed supply. The estimate excludes performance bonuses and penalties by design.
 - A source-driven Monte Carlo audit now models the actual dispatch pool, weather, rust and wheel-lock chances, payout/rating tiers, contract objective pool and reward snapshots, contract Gear drops, career Gear milestones, clean-streak rollover, free Surge recharge, VIP token costs, rig wear/service, supply replacement, and upgrade/commission costs. This supersedes the earlier simplified one-contract-per-10-calls estimate.
@@ -107,7 +102,7 @@ Career milestones add up to 15 more by call 275. Contract Gears are additional a
 
 ### Economy stress test — 2026-11-22
 
-Each scenario uses 30 seeded runs. Calls are median completion counts to all four tools at Level 24 and Rig Tier 6; the range is the 10th–90th percentile. Calendar days assume 10 completed calls per day.
+Each scenario uses 30 seeded runs. These call counts were generated before the Gold Gear reward reduction below and are now **historical / superseded**; do not use them as current time-to-max estimates. Re-run progression with the revised contract and clean-streak rewards before using new call counts.
 
 | Scenario | Main assumptions | Calls to max progression |
 |---|---|---:|
