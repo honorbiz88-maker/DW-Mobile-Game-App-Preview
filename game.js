@@ -171,13 +171,11 @@ const STAR_ORDER = [1, 3, 5, 2, 4];
 const AVATAR_PRESETS = ['🛞', '🚛', '🔧', '⚡', '🏆', '🔥', '🛡️', '👑'];
 
 const MAX_DISPATCH_SCANS = 2;
-const SCAN_RECHARGE_MS = 2 * 60 * 60 * 1000;
+const SCAN_RECHARGE_MS = 4 * 60 * 60 * 1000;
 
 const MAX_SURGE_CHARGES = 3;
-const SURGE_RECHARGE_MS = 8 * 60 * 60 * 1000;
+const SURGE_RECHARGE_MS = 12 * 60 * 60 * 1000;
 
-const MAX_TOKEN_DROPS = 3;
-const TOKEN_DROP_RECHARGE_MS = 6 * 60 * 60 * 1000;
 
 // Tightened 3-call clean-streak Gold Gear interval + streak milestone bonuses
 const CLEAN_STREAK_GEAR_INTERVAL = 3;
@@ -197,8 +195,6 @@ let state = {
   lastScanRechargeAt: Date.now(),
   surgeCharges: 3,
   lastSurgeRechargeAt: Date.now(),
-  tokenDropCharges: 3,
-  lastTokenDropRechargeAt: Date.now(),
   streak: 0,
   jobsCompleted: 0,
   zoneId: 'z1',
@@ -283,8 +279,6 @@ function loadState() {
     if (!state.lastScanRechargeAt) state.lastScanRechargeAt = Date.now();
     if (typeof state.surgeCharges !== 'number') state.surgeCharges = MAX_SURGE_CHARGES;
     if (!state.lastSurgeRechargeAt) state.lastSurgeRechargeAt = Date.now();
-    if (typeof state.tokenDropCharges !== 'number') state.tokenDropCharges = MAX_TOKEN_DROPS;
-    if (!state.lastTokenDropRechargeAt) state.lastTokenDropRechargeAt = Date.now();
   } catch (e) {
     state.jobs = [];
     state.activeJob = null;
@@ -327,10 +321,6 @@ function syncDispatchScanRecharge() {
 
 function syncSurgeRecharge() {
   return syncPoolRecharge('surgeCharges', 'lastSurgeRechargeAt', MAX_SURGE_CHARGES, SURGE_RECHARGE_MS);
-}
-
-function syncTokenDropRecharge() {
-  return syncPoolRecharge('tokenDropCharges', 'lastTokenDropRechargeAt', MAX_TOKEN_DROPS, TOKEN_DROP_RECHARGE_MS);
 }
 
 function formatMs(ms) {
@@ -1044,11 +1034,11 @@ function triggerSurgeAction() {
     <span class="badge">2X SURGE DISPATCH MULTIPLIER</span>
     <h3>Boost Next Call Payout (2x)</h3>
     <p style="font-size:12px;color:var(--muted);">
-      Active Stacked Surges: <strong style="color:var(--amber);">${state.surgeJobs}</strong> · Ad Charges: <strong style="color:var(--green);">${state.surgeCharges}/${MAX_SURGE_CHARGES}</strong>
-      ${state.surgeCharges < MAX_SURGE_CHARGES ? `<br>Next ad charge recharges in <strong>${formatMs(remMs)}</strong> (8h per charge).` : ''}
+      Active queued Surges: <strong style="color:var(--amber);">${state.surgeJobs}</strong> · Free charges: <strong style="color:var(--green);">${state.surgeCharges}/${MAX_SURGE_CHARGES}</strong>
+      ${state.surgeCharges < MAX_SURGE_CHARGES ? `<br>Next free charge in <strong>${formatMs(remMs)}</strong> (12-hour recharge).` : ''}
     </p>
-    <button class="secondary-btn" ${!hasAdCharge ? 'disabled' : ''} onclick="closeModal(); watchRewardedAd('surge');">
-      ${hasAdCharge ? `📺 WATCH AD FOR +1 SURGE (${state.surgeCharges}/${MAX_SURGE_CHARGES} LEFT)` : `⏳ SURGE AD RECHARGING (${formatMs(remMs)})`}
+    <button class="secondary-btn" ${!hasAdCharge ? 'disabled' : ''} onclick="closeModal(); activateFreeSurge();">
+      ${hasAdCharge ? `⚡ USE FREE SURGE CHARGE (${state.surgeCharges} LEFT)` : `⏳ FREE SURGE RECHARGING (${formatMs(remMs)})`}
     </button>
     <button class="primary-btn" onclick="closeModal(); activateInstantSurgeToken();">
       ⚡ INSTANT +1 SURGE (3 ⚡ TOKENS)
@@ -2589,14 +2579,9 @@ function renderShop() {
   if (!root) return;
 
   const surgeRemMs = syncSurgeRecharge();
-  const tokRemMs = syncTokenDropRecharge();
   const surgeCdTxt = state.surgeCharges < MAX_SURGE_CHARGES
     ? `Next free charge: ${formatMs(surgeRemMs)}`
     : 'Fully recharged';
-  const tokCdTxt = state.tokenDropCharges < MAX_TOKEN_DROPS
-    ? `Next free charge: ${formatMs(tokRemMs)}`
-    : 'Fully recharged';
-
   root.innerHTML = `
     <div class="item-card shop-status-card">
       <span class="badge">DELWIN SUPPLY DEPOT</span>
@@ -2617,8 +2602,6 @@ function renderShop() {
       <p style="font-size:11px;color:var(--muted);">${surgeCdTxt} · Recharges automatically.</p>
       <div class="shop-recharge-row"><span>📡 Dispatch scan drops</span><strong>${state.dispatchScans}/${MAX_DISPATCH_SCANS}</strong></div>
       <p style="font-size:11px;color:var(--muted);">${state.dispatchScans >= MAX_DISPATCH_SCANS ? 'Fully recharged' : `Next scan: ${formatMs(syncDispatchScanRecharge())}`} · Recharges automatically.</p>
-      <div class="shop-recharge-row"><span>⚡ Token drops</span><strong>${state.tokenDropCharges}/${MAX_TOKEN_DROPS}</strong></div>
-      <p style="font-size:11px;color:var(--muted);">${tokCdTxt} · Recharges automatically.</p>
     </div>
 
     <div class="item-card">
