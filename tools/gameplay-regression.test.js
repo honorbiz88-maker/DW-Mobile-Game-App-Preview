@@ -1144,25 +1144,27 @@ test('career call milestones award exactly 15 Gold Gears by call 275 and never r
   assert.equal(state.parts,15);
 });
 
-test('clean streak pays one Gear at 20, resets, and requires a fresh 20 clean calls', () => {
+test('clean streak pays one Gear at 20 while preserving independent career milestone awards', () => {
   const state={activeJob:null,cash:0,rep:0,jobsCompleted:0,parts:0,rigCondition:100,streak:0,claimedCareerGearMilestones:[],ratings:[],jobs:[],contract:null};
   const finish=gameFunction('completeJob',{
     state,stopHoldPsi:()=>{},SoundFX:{success:()=>{}},getFleetOverheadFee:()=>0,getZone:()=>({mult:1}),
     getStreakGearReward:n=>n%20===0?1:0,MAX_STREAK_ROLLOVER:20,refreshJobs:()=>{},saveState:()=>{},updateHUD:()=>{},openModal:()=>{}
   });
+  const careerGearAt=n=>Object.entries({10:1,30:2,60:2,100:3,175:3,275:4})
+    .filter(([milestone])=>n>=Number(milestone)).reduce((sum,[,reward])=>sum+reward,0);
   for(let call=1;call<=20;call++){
     state.activeJob={isTutorial:false,pay:0,surgeMultiplier:1,timeLeft:0,timeLimit:100,penalties:0,repPenalties:0,baseRep:0,dmg:{action:'plug'},veh:{heavy:false},fixed:true,step:5,torqueIdx:5,jackLowered:true,title:'Clean streak test'};
     finish();
-    assert.equal(state.parts,call===20?1:0);
+    assert.equal(state.parts,careerGearAt(call)+(call===20?1:0),`first clean streak call ${call}`);
   }
   assert.equal(state.streak,0);
-  for(let call=1;call<=19;call++){
+  for(let call=21;call<=39;call++){
     state.activeJob={isTutorial:false,pay:0,surgeMultiplier:1,timeLeft:0,timeLimit:100,penalties:0,repPenalties:0,baseRep:0,dmg:{action:'plug'},veh:{heavy:false},fixed:true,step:5,torqueIdx:5,jackLowered:true,title:'Second streak test'};
     finish();
-    assert.equal(state.parts,1);
+    assert.equal(state.parts,careerGearAt(call)+1,`second clean streak call ${call}`);
   }
   state.activeJob={isTutorial:false,pay:0,surgeMultiplier:1,timeLeft:0,timeLimit:100,penalties:0,repPenalties:0,baseRep:0,dmg:{action:'plug'},veh:{heavy:false},fixed:true,step:5,torqueIdx:5,jackLowered:true,title:'Second streak reward'};
   finish();
-  assert.equal(state.parts,2);
+  assert.equal(state.parts,careerGearAt(40)+2);
   assert.equal(state.streak,0);
 });
