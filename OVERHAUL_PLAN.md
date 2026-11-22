@@ -59,12 +59,54 @@ The game is intended to be **monetized at a later production stage**. Monetizati
 
 ## Active work: economy and progression validation
 
-1. Audit every inventory decrement, refill, repair action, maintenance cost, and dispatch estimate.
-2. Build exact Gear and cash progression models from the live source constants and formulas.
-3. Simulate casual, regular, dedicated, and high-volume play patterns across all six hubs.
-4. Validate time-to-unlock for each tool tier, rig tier, and territory against the intended career pacing.
-5. Review edge cases in contracts, ratings, streaks, Surge, dispatch refresh, and save migration.
-6. Make only evidence-backed balance changes; preserve approved progression decisions unless a measured issue justifies a change.
+### Source-verified upgrade cost baseline (Preview main)
+
+The current `game.js` formulas produce the following full-career upgrade requirement. These are exact purchase costs calculated from the current tool and rig constants, not estimated service earnings.
+
+| Hub | Tool upgrade cash | Rig commission cash | Total cash | Gold Gears |
+|---|---:|---:|---:|---:|
+| 1 · Atlanta Metro | $7,090 | $0 | $7,090 | 4 |
+| 2 · Georgia Freight | $21,610 | $1,800 | $23,410 | 9 |
+| 3 · Coastal Ports | $66,000 | $9,500 | $75,500 | 14 |
+| 4 · Southeast Express | $229,650 | $36,000 | $265,650 | 19 |
+| 5 · Gulf Corridor | $700,700 | $108,000 | $808,700 | 24 |
+| 6 · Apex Syndicate | $1,333,500 | $360,000 | $1,693,500 | 5 |
+| **Full progression** | **$2,358,550** | **$515,300** | **$2,873,850** | **75** |
+
+Gold Gear demand is 60 for the five tool breakthroughs across four tools, plus 15 for the five rig commissions. The final hub has no additional tool breakthrough Gear cost because the last tool breakthrough is the Level 20 → 21 purchase in Hub 5.
+
+### Source-verified reward streams
+
+- Career call milestones award 15 Gold Gears total by 275 completed calls (1, 2, 2, 3, 3, and 4 at the configured milestones).
+- Clean streak awards occur at 3, 6, 9, 12, and 15 consecutive clean calls: 1, 1, 2, 1, and 3 Gears. The streak resets after the 15-call reward.
+- Contracts award 1 Gear on every fifth completed contract; the Fast and Heavy contract types each also award 1 Gear directly.
+- Contract rewards and dispatch overhead are snapshotted when offered. Heavy contracts are gated until Hub 2 and the Tier 2 rig are available.
+
+A renewal-reward calculation using the current streak rules estimates the following streak-only Gear yield per completed call. It assumes a constant independent clean-call probability and is a sensitivity model, not observed player telemetry:
+
+| Clean-call rate | Expected streak Gears / call | Expected streak Gears over 275 calls |
+|---:|---:|---:|
+| 65% | 0.141 | 38.7 |
+| 75% | 0.208 | 57.3 |
+| 85% | 0.306 | 84.0 |
+| 92% | 0.399 | 109.6 |
+
+Career milestones add up to 15 more by call 275. Contract Gears are additional and depend on how quickly players complete and claim objectives. This makes clean performance and contract participation the main variables in Gear availability; do not tune Gear prices from the maximum-perfect-streak case alone.
+
+### Current conclusions
+
+- The previous roadmap's cash baseline was understated. The current full tool-plus-rig requirement is **$2,873,850**; use the table above for future planning.
+- Gear supply is plausibly sufficient for engaged players, but low-clean-rate players may rely more heavily on contract completion. Validate this with playtest telemetry before changing rewards or costs.
+- Rig maintenance now has a capped operating-overhead effect (0–20%) and service costs $1.50 per condition point restored. It is a modest operating incentive, not a hard failure gate.
+- Dispatch estimates subtract the estimated replacement cost of the consumed supply. The estimate excludes performance bonuses and penalties by design.
+
+### Remaining validation
+
+1. Build a cash-flow model using exact vehicle, weather, hazard, inventory-consumption, and zone distributions.
+2. Model contract completion rates and clean streaks across casual, regular, dedicated, and high-volume play patterns.
+3. Validate time-to-unlock for each tool tier, rig tier, and territory against intended career pacing.
+4. Review edge cases in ratings, Surge, dispatch refresh, and save migration.
+5. Make only evidence-backed balance changes; preserve approved progression decisions unless measured results justify a change.
 
 ## Next gameplay and product phases
 
