@@ -645,3 +645,30 @@ test('wheel-lock adapter is stage-gated, required only for locked wheels, and re
   assert.equal(clicks,1);
   assert.ok(alerts.some(x=>/KEY ALREADY SEATED/.test(x)));
 });
+
+
+test('job completion cannot bypass the repair, torque, or jack-release gates', () => {
+  const job={isTutorial:false,step:4,torqueIdx:0,fixed:false,jackLowered:false};
+  const state={activeJob:job,cash:0,rep:0,jobsCompleted:0,parts:0,rigCondition:100,streak:0,claimedCareerGearMilestones:[],ratings:[],jobs:[]};
+  let saves=0,modals=0;
+  const finish=gameFunction('completeJob',{
+    state,stopHoldPsi:()=>{},SoundFX:{success:()=>{}},getFleetOverheadFee:()=>0,
+    getZone:()=>({mult:1}),getStreakGearReward:()=>0,MAX_STREAK_ROLLOVER:20,
+    refreshJobs:()=>{},saveState:()=>{saves++;},updateHUD:()=>{},openModal:()=>{modals++;}
+  });
+  finish();
+  assert.equal(state.activeJob,job);
+  assert.equal(state.jobsCompleted,0);
+  assert.equal(saves,0);
+  assert.equal(modals,0);
+  job.step=5; job.torqueIdx=5; job.fixed=true;
+  finish();
+  assert.equal(state.activeJob,job,'jack must still be lowered before completion');
+  assert.equal(state.jobsCompleted,0);
+  job.jackLowered=true;
+  finish();
+  assert.equal(state.activeJob,null);
+  assert.equal(state.jobsCompleted,1);
+  assert.equal(saves,1);
+  assert.equal(modals,1);
+});
