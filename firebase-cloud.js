@@ -235,14 +235,19 @@ accountCard();
 // Deliberately invalid email/password ensures this request cannot create an account.
 (function addAuthKeyDiagnostic() {
   const statusEl = document.getElementById("cloud-account-status");
-  if (!statusEl || document.getElementById("cloud-auth-diagnostic")) return;
-  const button = document.createElement("button");
-  button.id = "cloud-auth-diagnostic";
-  button.type = "button";
-  button.className = "ghost-btn";
-  button.textContent = "RUN AUTH CONNECTION CHECK";
-  button.style.cssText = "font-size:10px;padding:7px;margin-top:4px;";
-  statusEl.insertAdjacentElement("afterend", button);
+  if (!statusEl) return;
+  let button = document.getElementById("cloud-auth-diagnostic");
+  if (!button) {
+    button = document.createElement("button");
+    button.id = "cloud-auth-diagnostic";
+    button.type = "button";
+    button.className = "ghost-btn";
+    button.textContent = "RUN AUTH CONNECTION CHECK";
+    button.style.cssText = "font-size:10px;padding:7px;margin-top:4px;";
+    statusEl.insertAdjacentElement("afterend", button);
+  }
+  if (button.dataset.authDiagnosticBound === "true") return;
+  button.dataset.authDiagnosticBound = "true";
   button.addEventListener("click", async () => {
     button.disabled = true;
     button.textContent = "CHECKING…";
