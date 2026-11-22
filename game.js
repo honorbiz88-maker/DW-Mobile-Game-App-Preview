@@ -1585,6 +1585,21 @@ function dismissAlert() {
   document.getElementById('diag-alert').classList.add('hidden');
 }
 
+function showBayActionHint(action, requiredStep) {
+  const job = state.activeJob;
+  if (!job) return;
+  const stages = {
+    1: 'Set traffic cones, place wheel chocks, then raise the jack fully.',
+    2: 'Remove all five wheel lugs, then take off the wheel.',
+    3: 'Run the tire scan, then choose the correct repair.',
+    4: 'Inflate or bleed the tire into the target PSI range, then lock pressure.',
+    5: 'Torque all five lugs in the star pattern, then lower and stow the jack.'
+  };
+  const current = stages[job.step] || 'Follow the active repair-bay instructions.';
+  const needed = stages[requiredStep] || 'Follow the active repair-bay instructions.';
+  showAlert('NOT READY YET', `${action} is available during repair stage ${requiredStep}. You're currently on stage ${job.step}. ${current} Next: ${needed}`);
+}
+
 function getTireSpritePath(job) {
   const prefix = job.veh.heavy ? 'assets/bay-hd-tire-' : 'assets/bay-tire-';
   const suffix = job.fixed ? 'good.png' : `${job.dmg.fileKey}.png`;
@@ -1601,7 +1616,10 @@ function toggleBayFloodlights() {
 
 function applyWheelLockKey() {
   const job = state.activeJob;
-  if (!job || job.step !== 2 || !job.hasWheelLock || job.lockKeyApplied) return;
+  if (!job) return;
+  if (job.step !== 2) { showBayActionHint('The wheel-lock key', 2); return; }
+  if (!job.hasWheelLock) { showAlert('NO SECURITY LOCK', 'This wheel does not have a locking lug. Continue removing the regular wheel lugs.'); return; }
+  if (job.lockKeyApplied) { showAlert('KEY ALREADY SEATED', 'The security key adapter is already applied. Continue removing the wheel lugs.'); return; }
   job.lockKeyApplied = true;
   dismissAlert();
   SoundFX.torqueClick();
@@ -2000,7 +2018,9 @@ function applyPsiTick(delta) {
 
 function setCones() {
   const job = state.activeJob;
-  if (!job || job.step !== 1 || job.conesSet) return;
+  if (!job) return;
+  if (job.step !== 1) { showBayActionHint('Deploying traffic cones', 1); return; }
+  if (job.conesSet) { showAlert('CONES ALREADY DEPLOYED', 'Traffic protection is set. Place the wheel chocks next.'); return; }
   job.conesSet = true;
   job.lastSpunLug = null;
   dismissAlert();
@@ -2010,7 +2030,9 @@ function setCones() {
 
 function setChocks() {
   const job = state.activeJob;
-  if (!job || job.step !== 1 || job.chocked) return;
+  if (!job) return;
+  if (job.step !== 1) { showBayActionHint('Placing wheel chocks', 1); return; }
+  if (job.chocked) { showAlert('WHEEL CHOCKS ALREADY SET', 'The vehicle is secured. Continue raising the jack to 100%.'); return; }
   if (!job.conesSet) {
     addBayPenalty(job, 10, 'DOT Safety Violation: Worked shoulder without traffic cones', 5);
     showAlert('DOT CONE ALERT (-$10 / -5 REP)', 'Deploy reflective highway traffic cones before chocking or lifting on the shoulder!');
@@ -2027,7 +2049,9 @@ function setChocks() {
 
 function pumpJack() {
   const job = state.activeJob;
-  if (!job || job.step !== 1 || job.liftPct >= 100) return;
+  if (!job) return;
+  if (job.step !== 1) { showBayActionHint('Operating the hydraulic jack', 1); return; }
+  if (job.liftPct >= 100) { showAlert('VEHICLE ALREADY LIFTED', 'The jack has reached full height. Continue with wheel removal.'); return; }
   if (!job.conesSet) {
     addBayPenalty(job, 10, 'DOT Safety Violation: Lifted without traffic cones', 5);
     showAlert('DOT CONE ALERT (-$10 / -5 REP)', 'Deploy highway traffic cones first to protect your roadside bay!');
@@ -2061,7 +2085,10 @@ function triggerLugSpin(job, id) {
 function tapLug(id) {
   const job = state.activeJob;
   if (!job || !Number.isInteger(id) || id < 1 || id > 5) return;
-  if (job.step !== 1 && job.step !== 2 && job.step !== 5) return;
+  if (job.step !== 1 && job.step !== 2 && job.step !== 5) {
+    showBayActionHint('Working on wheel lugs', job.step < 2 ? 1 : job.step < 5 ? 2 : 5);
+    return;
+  }
   const w = job.weather || WEATHER_CONDITIONS[0];
 
   if (job.step === 1) {
@@ -2124,7 +2151,11 @@ function tapLug(id) {
 
 function lowerJackAndFinish() {
   const job = state.activeJob;
-  if (!job || job.step !== 5 || job.torqueIdx !== 5 || !job.fixed || job.jackLowered) return;
+  if (!job) return;
+  if (job.step !== 5) { showBayActionHint('Lowering the jack', 5); return; }
+  if (job.torqueIdx !== 5) { showAlert('TORQUE ALL FIVE LUGS FIRST', `You have torqued ${job.torqueIdx || 0} of 5 lugs. Finish the star pattern before lowering the jack.`); return; }
+  if (!job.fixed) { showAlert('REPAIR NOT COMPLETE', 'Complete the tire repair before releasing the vehicle.'); return; }
+  if (job.jackLowered) { showAlert('JACK ALREADY LOWERED', 'The vehicle is being released.'); return; }
   job.jackLowered = true;
   SoundFX.jack();
   renderBay();
@@ -2135,7 +2166,9 @@ function lowerJackAndFinish() {
 
 function runScan() {
   const job = state.activeJob;
-  if (!job || job.step !== 3 || job.scanned) return;
+  if (!job) return;
+  if (job.step !== 3) { showBayActionHint('Running the tire diagnostic scan', 3); return; }
+  if (job.scanned) { showAlert('SCAN ALREADY COMPLETE', 'Review the diagnosis and choose the required repair.'); return; }
   job.lastSpunLug = null;
   SoundFX.scan();
   job.scanned = true;
@@ -2144,7 +2177,10 @@ function runScan() {
 
 function performRepair(choice) {
   const job = state.activeJob;
-  if (!job || job.step !== 3 || !job.scanned || job.fixed) return;
+  if (!job) return;
+  if (job.step !== 3) { showBayActionHint('Repairing the tire', 3); return; }
+  if (!job.scanned) { showAlert('SCAN THE TIRE FIRST', 'Run the diagnostic scan so you can choose the safe, correct repair.'); return; }
+  if (job.fixed) { showAlert('REPAIR ALREADY COMPLETE', 'Continue to PSI calibration and lock the pressure.'); return; }
   if (choice !== 'plug' && choice !== 'swap') return;
   job.lastSpunLug = null;
 
@@ -2224,7 +2260,9 @@ function droneDrop() {
 
 function lockPsi() {
   const job = state.activeJob;
-  if (!job || job.step !== 4 || !job.fixed) return;
+  if (!job) return;
+  if (job.step !== 4) { showBayActionHint('Locking tire pressure', 4); return; }
+  if (!job.fixed) { showAlert('COMPLETE THE TIRE REPAIR FIRST', 'Finish the plug or tire swap before calibrating and locking PSI.'); return; }
   job.lastSpunLug = null;
   const t = job.veh.targetPsi;
   const tol = 2 + Math.floor((state.tools.comp.level - 1) / 8);
