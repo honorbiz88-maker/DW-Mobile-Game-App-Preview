@@ -1688,3 +1688,32 @@ test('offline saves stay local and do not attempt a cloud write', async () => {
   assert.equal(h.calls.writes.length, 0);
   assert.equal(h.store.get('delwin_v4_save'), JSON.stringify({ cash: 50 }));
 });
+
+test('mobile interaction targets, viewport, and touch cancellation safeguards stay intact', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'style.css'), 'utf8');
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+
+  assert.match(html, /name="viewport"[^>]*width=device-width/,
+    'The page must use the device viewport');
+  assert.match(css, /\.app-shell\s*\{[\s\S]*?max-width:\s*480px/,
+    'The mobile game shell must remain constrained to a phone-sized layout');
+  assert.match(css, /html,\s*body\s*\{[\s\S]*?overflow-x:\s*hidden/,
+    'The page must not introduce horizontal scrolling');
+  assert.match(css, /\.lug-btn\s*\{[\s\S]*?width:\s*44px[\s\S]*?height:\s*44px/,
+    'Wheel lug hit targets must remain at least 44px square');
+  assert.match(css, /\.hold-btn\s*\{[\s\S]*?min-height:\s*48px[\s\S]*?touch-action:\s*none/,
+    'Continuous PSI controls must retain large touch targets and suppress browser gestures');
+  assert.match(css, /\.primary-btn\s*\{[\s\S]*?min-height:\s*44px/);
+  assert.match(css, /\.secondary-btn\s*\{[\s\S]*?min-height:\s*44px/);
+  assert.match(css, /\.nav-btn\s*\{[\s\S]*?min-height:\s*48px/,
+    'Bottom navigation must retain a usable touch height');
+  assert.match(source, /onpointerup="stopHoldPsi\(\)"/);
+  assert.match(source, /onpointerleave="stopHoldPsi\(\)"/);
+  assert.match(source, /onpointercancel="stopHoldPsi\(\)"/,
+    'PSI hold must stop when a touch is cancelled');
+  assert.match(source, /window\.addEventListener\('blur', stopHoldPsi\)/);
+  assert.match(source, /document\.addEventListener\('visibilitychange',[\s\S]*?stopHoldPsi\(\)/,
+    'PSI hold must stop when the app is backgrounded');
+  assert.match(css, /@media\s*\(prefers-reduced-motion:\s*reduce\)/,
+    'Reduced-motion preferences must be respected');
+});
