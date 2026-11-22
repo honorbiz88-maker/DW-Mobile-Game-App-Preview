@@ -1414,7 +1414,8 @@ function renderJobs() {
     const supplyCost = getSupplyReplacementCost(j);
     // This estimate includes the actual marginal restock cost of the consumed supply,
     // but excludes performance bonuses and penalties.
-    const projected = Math.max(0, j.pay * (state.surgeJobs > 0 ? 2 : 1) - overhead - supplyCost);
+    const grossEstimate = j.pay * (state.surgeJobs > 0 ? 2 : 1);
+    const projected = Math.max(0, grossEstimate - overhead - supplyCost);
     const risk = getDispatchRiskScore(j);
     const isRecommendedFirstCall = !!firstCallRecommendation && firstCallRecommendation.index === jobIndex;
     const riskLabel = risk >= 5 ? 'HIGH RISK' : risk >= 3 ? 'MODERATE' : 'ROUTINE';
@@ -1446,6 +1447,12 @@ function renderJobs() {
           <span style="color:${riskColor};">● ${riskLabel}</span>
           <span>NET EST. AFTER SUPPLIES <strong>${Math.round(projected)}</strong></span>
           <span>⏱ ${j.timeLimit}s SLA</span>
+        </div>
+        <div class="dispatch-net-breakdown" style="display:flex;flex-wrap:wrap;gap:6px 12px;padding:7px 9px;margin:5px 0;background:rgba(15,23,42,.42);border-radius:7px;font-size:10px;color:var(--muted);">
+          <span>Gross: <strong style="color:var(--text);">${Math.round(grossEstimate)}</strong></span>
+          <span>Supply reserve: <strong style="color:var(--text);">−${Math.round(supplyCost)}</strong></span>
+          <span>Operating overhead: <strong style="color:var(--text);">−${Math.round(overhead)}</strong></span>
+          <span style="width:100%;font-size:9px;">Estimate excludes speed bonuses and any penalties.</span>
         </div>
         <div class="job-meta">
           <span>🛞 ${heavy ? 'HD Tire' : 'Std Tire'} · ${j.veh.targetPsi} PSI${hazardBadge}${lockBadge}</span>
