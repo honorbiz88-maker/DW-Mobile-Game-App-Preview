@@ -98,7 +98,7 @@ test('new cloud accounts initialize local ownership before the first gameplay sa
 });
 
 test('malformed local save values are treated as invalid and never auto-restored over cloud', () => {
-  assert.match(cloudSource, /parsed && typeof parsed === "object" && !Array\.isArray\(parsed\) \? \{ raw, payload: parsed \} : \{ raw, invalid: true \}/);
+  assert.match(cloudSource, /parsed && typeof parsed === "object" && !Array\.isArray\(parsed\) \? \{ raw, payload: parsed, ownerUid: localStorage\.getItem\(OWNER_KEY\) \} : \{ raw, invalid: true \}/);
   assert.match(cloudSource, /if \(local\?\.invalid\) return;/);
 });
 
