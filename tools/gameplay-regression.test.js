@@ -1093,35 +1093,36 @@ test('rig commission deducts exact resources once and cannot re-commission an un
 });
 
 
-test('six hub entry REP gates align with the first territory in each hub', () => {
-  const zones=[
-    {id:'z1',hubNum:1,unlockRep:0},{id:'z2',hubNum:1,unlockRep:450},{id:'z3',hubNum:1,unlockRep:900},{id:'z4',hubNum:1,unlockRep:1350},
-    {id:'z5',hubNum:2,unlockRep:1800},{id:'z6',hubNum:2,unlockRep:3200},{id:'z7',hubNum:2,unlockRep:4650},{id:'z8',hubNum:2,unlockRep:6100},
-    {id:'z9',hubNum:3,unlockRep:7500},{id:'z10',hubNum:3,unlockRep:10900},{id:'z11',hubNum:3,unlockRep:14250},{id:'z12',hubNum:3,unlockRep:17600},
-    {id:'z13',hubNum:4,unlockRep:21000},{id:'z14',hubNum:4,unlockRep:27000},{id:'z15',hubNum:4,unlockRep:33000},{id:'z16',hubNum:4,unlockRep:39000},
-    {id:'z17',hubNum:5,unlockRep:45000},{id:'z18',hubNum:5,unlockRep:53750},{id:'z19',hubNum:5,unlockRep:62500},{id:'z20',hubNum:5,unlockRep:71250},
-    {id:'z21',hubNum:6,unlockRep:80000},{id:'z22',hubNum:6,unlockRep:90000},{id:'z23',hubNum:6,unlockRep:100000},{id:'z24',hubNum:6,unlockRep:110000}
-  ];
-  const hubs=[
-    {hubNum:1,entryRep:0},{hubNum:2,entryRep:1800},{hubNum:3,entryRep:7500},
-    {hubNum:4,entryRep:21000},{hubNum:5,entryRep:45000},{hubNum:6,entryRep:80000}
-  ];
+test('six hub entry REP gates align with the live HUB_TIERS and ZONES source data', () => {
+  const readArray = name => {
+    const match = source.match(new RegExp('const\\s+' + name + '\\s*=\\s*(\\[[\\s\\S]*?\\n\\]);'));
+    assert.ok(match, `Could not read ${name} from game.js`);
+    return vm.runInNewContext(match[1]);
+  };
+  const hubs = readArray('HUB_TIERS');
+  const zones = readArray('ZONES');
+  assert.equal(hubs.length, 6);
   for (const hub of hubs) {
-    assert.equal(zones.find(z=>z.hubNum===hub.hubNum).unlockRep,hub.entryRep);
-    assert.equal(zones.filter(z=>z.hubNum===hub.hubNum).length,4);
+    const hubZones = zones.filter(zone => zone.hubNum === hub.hubNum);
+    assert.equal(hubZones.length, 4, `Hub ${hub.hubNum} territory count`);
+    assert.equal(hubZones[0].unlockRep, hub.entryRep, `Hub ${hub.hubNum} entry REP`);
+    assert.ok(hubZones.every((zone, index) => index === 0 || zone.unlockRep > hubZones[index - 1].unlockRep),
+      `Hub ${hub.hubNum} territory REP must increase`);
   }
 });
 
-test('six rig tiers require sequential commissions and the correct four-tool level milestones', () => {
-  const rigs=[
-    {tier:1,reqLvl:1,cashCost:0,partCost:0},{tier:2,reqLvl:5,cashCost:1800,partCost:1},
-    {tier:3,reqLvl:9,cashCost:9500,partCost:2},{tier:4,reqLvl:13,cashCost:36000,partCost:3},
-    {tier:5,reqLvl:17,cashCost:108000,partCost:4},{tier:6,reqLvl:21,cashCost:360000,partCost:5}
-  ];
-  assert.deepEqual(rigs.map(r=>r.reqLvl),[1,5,9,13,17,21]);
-  assert.deepEqual(rigs.slice(1).map(r=>r.partCost),[1,2,3,4,5]);
-  assert.equal(rigs.slice(1).reduce((sum,r)=>sum+r.partCost,0),15);
-  for (let i=1;i<rigs.length;i++) assert.equal(rigs[i].tier,rigs[i-1].tier+1);
+test('six rig tiers validate the live RIG_TIERS source data and Gear budget', () => {
+  const match = source.match(/const\\s+RIG_TIERS\\s*=\\s*(\\[[\\s\\S]*?\\n\\]);/);
+  assert.ok(match, 'Could not read RIG_TIERS from game.js');
+  const rigs = vm.runInNewContext(match[1]);
+  assert.equal(rigs.length, 6);
+  assert.deepEqual(Array.from(rigs, rig => rig.reqLvl), [1, 5, 9, 13, 17, 21]);
+  assert.deepEqual(Array.from(rigs.slice(1), rig => rig.partCost), [1, 2, 3, 4, 5]);
+  assert.equal(rigs.slice(1).reduce((sum, rig) => sum + rig.partCost, 0), 15);
+  for (let i = 0; i < rigs.length; i++) {
+    assert.equal(rigs[i].tier, i + 1);
+    if (i > 0) assert.equal(rigs[i].reqLvl, rigs[i - 1].reqLvl + 4);
+  }
 });
 
 test('career call milestones award exactly 15 Gold Gears by call 275 and never repeat', () => {
