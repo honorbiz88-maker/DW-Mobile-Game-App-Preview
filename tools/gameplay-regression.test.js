@@ -80,6 +80,23 @@ test('cloud writes and conflict choices remain bound to the originating account'
   assert.match(cloudSource, /pendingConflict = null;[\s\S]*?busy = false;/);
 });
 
+test('local career ownership prevents silent upload to a different signed-in account', () => {
+  assert.match(cloudSource, /const OWNER_KEY = "delwin_cloud_owner_uid"/);
+  assert.match(cloudSource, /ownerUid: localStorage\.getItem\(OWNER_KEY\)/);
+  assert.match(cloudSource, /if \(local\?\.ownerUid && local\.ownerUid !== user\.uid\) \{[\s\S]*?Nothing was uploaded/);
+  assert.match(cloudSource, /localStorage\.getItem\(OWNER_KEY\) !== currentUser\.uid/);
+  assert.match(cloudSource, /localStorage\.setItem\(OWNER_KEY, pending\.uid\)/);
+  assert.match(cloudSource, /localStorage\.setItem\(OWNER_KEY, currentUser\.uid\)/);
+});
+
+test('new cloud accounts initialize local ownership before the first gameplay save', () => {
+  const noCloudBranch = cloudSource.indexOf('if (!snap.exists())');
+  const ownerSet = cloudSource.indexOf('localStorage.setItem(OWNER_KEY, user.uid);', noCloudBranch);
+  const readySet = cloudSource.indexOf('syncReady = true;', noCloudBranch);
+  assert.ok(noCloudBranch >= 0 && ownerSet > noCloudBranch && ownerSet < readySet,
+    'Owner marker must be set before cloud sync is enabled for a new account');
+});
+
 test('malformed local save values are treated as invalid and never auto-restored over cloud', () => {
   assert.match(cloudSource, /parsed && typeof parsed === "object" && !Array\.isArray\(parsed\) \? \{ raw, payload: parsed \} : \{ raw, invalid: true \}/);
   assert.match(cloudSource, /if \(local\?\.invalid\) return;/);
