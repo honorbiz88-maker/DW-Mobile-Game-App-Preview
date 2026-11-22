@@ -1091,3 +1091,78 @@ test('rig commission deducts exact resources once and cannot re-commission an un
   assert.equal(renders,1);
   assert.equal(modals,1);
 });
+
+
+test('six hub entry REP gates align with the first territory in each hub', () => {
+  const zones=[
+    {id:'z1',hubNum:1,unlockRep:0},{id:'z2',hubNum:1,unlockRep:450},{id:'z3',hubNum:1,unlockRep:900},{id:'z4',hubNum:1,unlockRep:1350},
+    {id:'z5',hubNum:2,unlockRep:1800},{id:'z6',hubNum:2,unlockRep:3200},{id:'z7',hubNum:2,unlockRep:4650},{id:'z8',hubNum:2,unlockRep:6100},
+    {id:'z9',hubNum:3,unlockRep:7500},{id:'z10',hubNum:3,unlockRep:10900},{id:'z11',hubNum:3,unlockRep:14250},{id:'z12',hubNum:3,unlockRep:17600},
+    {id:'z13',hubNum:4,unlockRep:21000},{id:'z14',hubNum:4,unlockRep:27000},{id:'z15',hubNum:4,unlockRep:33000},{id:'z16',hubNum:4,unlockRep:39000},
+    {id:'z17',hubNum:5,unlockRep:45000},{id:'z18',hubNum:5,unlockRep:53750},{id:'z19',hubNum:5,unlockRep:62500},{id:'z20',hubNum:5,unlockRep:71250},
+    {id:'z21',hubNum:6,unlockRep:80000},{id:'z22',hubNum:6,unlockRep:90000},{id:'z23',hubNum:6,unlockRep:100000},{id:'z24',hubNum:6,unlockRep:110000}
+  ];
+  const hubs=[
+    {hubNum:1,entryRep:0},{hubNum:2,entryRep:1800},{hubNum:3,entryRep:7500},
+    {hubNum:4,entryRep:21000},{hubNum:5,entryRep:45000},{hubNum:6,entryRep:80000}
+  ];
+  for (const hub of hubs) {
+    assert.equal(zones.find(z=>z.hubNum===hub.hubNum).unlockRep,hub.entryRep);
+    assert.equal(zones.filter(z=>z.hubNum===hub.hubNum).length,4);
+  }
+});
+
+test('six rig tiers require sequential commissions and the correct four-tool level milestones', () => {
+  const rigs=[
+    {tier:1,reqLvl:1,cashCost:0,partCost:0},{tier:2,reqLvl:5,cashCost:1800,partCost:1},
+    {tier:3,reqLvl:9,cashCost:9500,partCost:2},{tier:4,reqLvl:13,cashCost:36000,partCost:3},
+    {tier:5,reqLvl:17,cashCost:108000,partCost:4},{tier:6,reqLvl:21,cashCost:360000,partCost:5}
+  ];
+  assert.deepEqual(rigs.map(r=>r.reqLvl),[1,5,9,13,17,21]);
+  assert.deepEqual(rigs.slice(1).map(r=>r.partCost),[1,2,3,4,5]);
+  assert.equal(rigs.slice(1).reduce((sum,r)=>sum+r.partCost,0),15);
+  for (let i=1;i<rigs.length;i++) assert.equal(rigs[i].tier,rigs[i-1].tier+1);
+});
+
+test('career call milestones award exactly 15 Gold Gears by call 275 and never repeat', () => {
+  const rewards={10:1,30:2,60:2,100:3,175:3,275:4};
+  const state={activeJob:null,cash:0,rep:0,jobsCompleted:0,parts:0,rigCondition:100,streak:0,claimedCareerGearMilestones:[],ratings:[],jobs:[],contract:null};
+  const finish=gameFunction('completeJob',{
+    state,stopHoldPsi:()=>{},SoundFX:{success:()=>{}},getFleetOverheadFee:()=>0,getZone:()=>({mult:1}),
+    getStreakGearReward:()=>0,MAX_STREAK_ROLLOVER:20,refreshJobs:()=>{},saveState:()=>{},updateHUD:()=>{},openModal:()=>{}
+  });
+  for(let call=1;call<=275;call++){
+    state.activeJob={isTutorial:false,pay:0,surgeMultiplier:1,timeLeft:0,timeLimit:100,penalties:0,repPenalties:0,baseRep:0,dmg:{action:'plug'},veh:{heavy:false},fixed:true,step:5,torqueIdx:5,jackLowered:true,title:'Milestone test'};
+    finish();
+    assert.equal(state.jobsCompleted,call);
+    assert.equal(state.parts,Object.entries(rewards).filter(([m])=>call>=Number(m)).reduce((n,[,v])=>n+v,0));
+  }
+  assert.equal(state.parts,15);
+  assert.deepEqual(state.claimedCareerGearMilestones,[10,30,60,100,175,275]);
+  state.activeJob={isTutorial:false,pay:0,surgeMultiplier:1,timeLeft:0,timeLimit:100,penalties:0,repPenalties:0,baseRep:0,dmg:{action:'plug'},veh:{heavy:false},fixed:true,step:5,torqueIdx:5,jackLowered:true,title:'Post-milestone test'};
+  finish();
+  assert.equal(state.parts,15);
+});
+
+test('clean streak pays one Gear at 20, resets, and requires a fresh 20 clean calls', () => {
+  const state={activeJob:null,cash:0,rep:0,jobsCompleted:0,parts:0,rigCondition:100,streak:0,claimedCareerGearMilestones:[],ratings:[],jobs:[],contract:null};
+  const finish=gameFunction('completeJob',{
+    state,stopHoldPsi:()=>{},SoundFX:{success:()=>{}},getFleetOverheadFee:()=>0,getZone:()=>({mult:1}),
+    getStreakGearReward:n=>n%20===0?1:0,MAX_STREAK_ROLLOVER:20,refreshJobs:()=>{},saveState:()=>{},updateHUD:()=>{},openModal:()=>{}
+  });
+  for(let call=1;call<=20;call++){
+    state.activeJob={isTutorial:false,pay:0,surgeMultiplier:1,timeLeft:0,timeLimit:100,penalties:0,repPenalties:0,baseRep:0,dmg:{action:'plug'},veh:{heavy:false},fixed:true,step:5,torqueIdx:5,jackLowered:true,title:'Clean streak test'};
+    finish();
+    assert.equal(state.parts,call===20?1:0);
+  }
+  assert.equal(state.streak,0);
+  for(let call=1;call<=19;call++){
+    state.activeJob={isTutorial:false,pay:0,surgeMultiplier:1,timeLeft:0,timeLimit:100,penalties:0,repPenalties:0,baseRep:0,dmg:{action:'plug'},veh:{heavy:false},fixed:true,step:5,torqueIdx:5,jackLowered:true,title:'Second streak test'};
+    finish();
+    assert.equal(state.parts,1);
+  }
+  state.activeJob={isTutorial:false,pay:0,surgeMultiplier:1,timeLeft:0,timeLimit:100,penalties:0,repPenalties:0,baseRep:0,dmg:{action:'plug'},veh:{heavy:false},fixed:true,step:5,torqueIdx:5,jackLowered:true,title:'Second streak reward'};
+  finish();
+  assert.equal(state.parts,2);
+  assert.equal(state.streak,0);
+});
