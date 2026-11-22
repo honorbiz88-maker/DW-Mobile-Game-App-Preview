@@ -30,6 +30,28 @@
         <div role="status" style="font-size:11px;color:var(--muted);">Your progress and game economy save automatically in this browser. No account or sign-up is required. Keep using this same browser on this device to continue your career.</div>
       </section>
 
+      <section id="cloud-account-card" style="background:#090c12;border:1px solid var(--border);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px;">
+        <div style="font-size:12px;font-weight:900;color:var(--amber);">OPTIONAL CLOUD BACKUP</div>
+        <div id="cloud-signed-out">
+          <p style="font-size:11px;color:var(--muted);margin:0 0 8px;">Keep playing as a guest with this device's automatic local save. Create an account or sign in only if you want to back up your career and move it between devices.</p>
+          <label for="cloud-email" style="display:block;font-size:10px;color:var(--muted);margin-bottom:4px;">EMAIL</label>
+          <input id="cloud-email" type="email" autocomplete="email" placeholder="you@example.com" style="width:100%;box-sizing:border-box;margin-bottom:8px;" />
+          <label for="cloud-password" style="display:block;font-size:10px;color:var(--muted);margin-bottom:4px;">PASSWORD</label>
+          <input id="cloud-password" type="password" autocomplete="current-password" placeholder="At least 6 characters" style="width:100%;box-sizing:border-box;margin-bottom:8px;" />
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button id="cloud-create" type="button" class="primary-btn" style="flex:1;min-width:120px;">CREATE & BACK UP</button>
+            <button id="cloud-signin" type="button" class="secondary-btn" style="flex:1;min-width:90px;">SIGN IN</button>
+          </div>
+          <button id="cloud-reset" type="button" class="ghost-btn" style="font-size:10px;padding:7px;margin-top:5px;">FORGOT PASSWORD?</button>
+        </div>
+        <div id="cloud-signed-in" hidden>
+          <div id="cloud-user-email" style="font-size:11px;color:var(--text);"></div>
+          <p style="font-size:11px;color:var(--muted);margin:6px 0;">Cloud backup is connected. Your local career remains available on this device.</p>
+          <button id="cloud-signout" type="button" class="secondary-btn">SIGN OUT</button>
+        </div>
+        <div id="cloud-account-status" role="status" aria-live="polite" style="font-size:10px;color:var(--muted);">Sign in to back up your career across devices.</div>
+      </section>
+
       <nav class="drawer-nav">
         <button onclick="toggleDrawer(false); goPage('dispatch');">🚨 Live Dispatch Board</button>
         <button onclick="toggleDrawer(false); goPage('bay');">🔧 Active Repair Bay</button>
@@ -182,5 +204,6 @@
   </div>
 
   <script src="game.js"></script>
+  <script type="module" src="firebase-cloud.js"></script>
 </body>
 </html>
