@@ -165,6 +165,7 @@ async function reconcile(user) {
         localStorage.setItem(OWNER_KEY, user.uid);
         status("Your existing device career is backed up to your account.");
       } else {
+        localStorage.setItem(OWNER_KEY, user.uid);
         status("Account connected. Your career will sync after your first save.");
       }
       syncReady = true;
