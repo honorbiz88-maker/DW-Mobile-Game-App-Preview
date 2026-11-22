@@ -2046,7 +2046,7 @@ function triggerLugSpin(job, id) {
 function tapLug(id) {
   const job = state.activeJob;
   if (!job || !Number.isInteger(id) || id < 1 || id > 5) return;
-  if (job.step !== 2 && job.step !== 5) return;
+  if (job.step !== 1 && job.step !== 2 && job.step !== 5) return;
   const w = job.weather || WEATHER_CONDITIONS[0];
 
   if (job.step === 1) {
