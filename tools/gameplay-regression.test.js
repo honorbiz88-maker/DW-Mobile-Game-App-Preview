@@ -258,3 +258,195 @@ test('incomplete contracts cannot be claimed or grant resources', () => {
   assert.equal(state.parts, 0);
   assert.equal(state.cash, 0);
 });
+
+
+test('live job completion calculates payout, REP, milestone Gear, contract progress, and saves once', () => {
+  const job = {
+    isTutorial: false, pay: 100, surgeMultiplier: 1.5,
+    timeLeft: 60, timeLimit: 100, penalties: 10, repPenalties: 6,
+    baseRep: 40, dmg: { action: 'plug' }, veh: { heavy: false },
+    fixed: true, title: 'Regression Roadside Call', penaltyLog: []
+  };
+  const state = {
+    activeJob: job, cash: 500, rep: 20, jobsCompleted: 9, parts: 0,
+    rigCondition: 100, streak: 7, claimedCareerGearMilestones: [],
+    contract: { type: 'fast', progress: 0, target: 1 },
+    ratings: [], jobs: []
+  };
+  let saves = 0;
+  let hudUpdates = 0;
+  let invoice = '';
+  const finish = gameFunction('completeJob', {
+    state,
+    stopHoldPsi: () => {},
+    SoundFX: { success: () => {} },
+    getFleetOverheadFee: () => 12,
+    getZone: () => ({ mult: 1 }),
+    getStreakGearReward: () => 0,
+    MAX_STREAK_ROLLOVER: 20,
+    refreshJobs: () => {},
+    saveState: () => { saves += 1; },
+    updateHUD: () => { hudUpdates += 1; },
+    openModal: (html) => { invoice = html; }
+  });
+
+  finish();
+  assert.equal(state.activeJob, null);
+  assert.equal(state.cash, 636); // $150 gross + $8 fast bonus - $10 penalty - $12 overhead
+  assert.equal(state.rep, 64); // 40 base + 10 fast bonus - 6 REP penalty + 20 starting REP
+  assert.equal(state.jobsCompleted, 10);
+  assert.equal(state.parts, 1); // call-10 career milestone only
+  assert.equal(state.rigCondition, 98.5);
+  assert.equal(state.contract.progress, 1);
+  assert.equal(state.ratings.at(-1), 4.9);
+  assert.match(invoice, /Net Collected:/);
+  assert.match(invoice, /\$136/);
+  assert.equal(saves, 1);
+  assert.equal(hudUpdates, 1);
+
+  finish();
+  assert.equal(state.cash, 636);
+  assert.equal(state.jobsCompleted, 10);
+  assert.equal(saves, 1);
+});
+
+test('tool breakthrough purchase atomically charges cash and Gold Gears', () => {
+  const state = {
+    cash: 150, parts: 1,
+    tools: { jack: { name: 'Hydraulic Jack', level: 4 } }
+  };
+  let saves = 0;
+  let updates = 0;
+  const upgrade = gameFunction('upgradeTool', {
+    state,
+    getToolUpgradeSpec: () => ({ cost: 100, gears: 1 }),
+    previewToolTiers: {},
+    SoundFX: { success: () => {} },
+    saveState: () => { saves += 1; },
+    updateHUD: () => { updates += 1; },
+    renderGarage: () => {}
+  });
+  upgrade('jack');
+  assert.equal(state.cash, 50);
+  assert.equal(state.parts, 0);
+  assert.equal(state.tools.jack.level, 5);
+  assert.equal(saves, 1);
+  assert.equal(updates, 1);
+});
+
+test('tool breakthrough purchase rejects missing Gear without charging cash', () => {
+  const state = {
+    cash: 500, parts: 0,
+    tools: { jack: { name: 'Hydraulic Jack', level: 4 } }
+  };
+  let saves = 0;
+  let alert = '';
+  const upgrade = gameFunction('upgradeTool', {
+    state,
+    getToolUpgradeSpec: () => ({ cost: 100, gears: 1 }),
+    previewToolTiers: {},
+    showAlert: (title) => { alert = title; },
+    SoundFX: { success: () => {} },
+    saveState: () => { saves += 1; },
+    updateHUD: () => {},
+    renderGarage: () => {}
+  });
+  upgrade('jack');
+  assert.equal(state.cash, 500);
+  assert.equal(state.parts, 0);
+  assert.equal(state.tools.jack.level, 4);
+  assert.match(alert, /GOLD GEARS REQUIRED/);
+  assert.equal(saves, 0);
+});
+
+test('rig commission enforces sequential tier, tool level, cash, and Gear gates before charging', () => {
+  const rig = {
+    name: 'Tier 2 Service Rig', reqLvl: 4, cashCost: 1800, partCost: 1,
+    perk: 'Expanded fleet capacity', capStd: 4, capHd: 2, capPlugs: 6
+  };
+  const state = { unlockedRigTier: 1, cash: 2000, parts: 1 };
+  let saves = 0;
+  let updates = 0;
+  const commission = gameFunction('purchaseRigTier', {
+    RIG_TIERS: [null, rig],
+    state,
+    getMinToolLevel: () => 4,
+    SoundFX: { success: () => {} },
+    saveState: () => { saves += 1; },
+    updateHUD: () => { updates += 1; },
+    renderGarage: () => {},
+    openModal: () => {}
+  });
+  commission(2);
+  assert.equal(state.cash, 200);
+  assert.equal(state.parts, 0);
+  assert.equal(state.unlockedRigTier, 2);
+  assert.equal(saves, 1);
+  assert.equal(updates, 1);
+});
+
+test('legacy local save migration clamps and backfills fields without duplicating earned milestones', () => {
+  const legacy = {
+    tires: 3,
+    jobsCompleted: 30,
+    tools: { jack: { level: 30 } },
+    rigCondition: 140,
+    contractsCompleted: 'invalid',
+    ratings: [],
+    customerLedger: [],
+    jobs: [null, { veh: {}, dmg: {} }, { veh: null, dmg: {} }],
+    activeJob: { step: 3 },
+    zoneId: 'missing-zone',
+    contract: { type: 'fast', progress: 0, target: 3 }
+  };
+  const state = {
+    tools: {
+      impact: { level: 1 }, jack: { level: 1 },
+      comp: { level: 1 }, radar: { level: 1 }
+    },
+    jobs: [], activeJob: null, ratings: [], customerLedger: {},
+    claimedCareerGearMilestones: []
+  };
+  const load = gameFunction('loadState', {
+    state,
+    localStorage: { getItem: () => JSON.stringify(legacy) },
+    ZONES: [{ id: 'z1', mult: 1 }],
+    rollNewContract: () => { state.contract = { type: 'fast', progress: 0, target: 3 }; },
+    canDispatchHeavyJobs: () => false,
+    getZone: () => ({ mult: 1 }),
+    MAX_DISPATCH_SCANS: 3,
+    MAX_SURGE_CHARGES: 3,
+    Date: { now: () => 123456 }
+  });
+  load();
+  assert.equal(state.stdTires, 3);
+  assert.equal(state.tools.jack.level, 24);
+  assert.equal(state.tools.impact.level, 1);
+  assert.equal(state.rigCondition, 100);
+  assert.equal(state.contractsCompleted, 0);
+  assert.deepEqual(state.claimedCareerGearMilestones, [10, 30]);
+  assert.deepEqual(state.ratings, [5.0]);
+  assert.deepEqual(state.customerLedger, {});
+  assert.equal(state.jobs.length, 1);
+  assert.equal(state.activeJob, null);
+  assert.equal(state.zoneId, 'z1');
+  assert.equal(state.firstDispatchBriefingSeen, true);
+  assert.equal(state.dispatchScans, 3);
+  assert.equal(state.surgeCharges, 3);
+  assert.equal(state.lastScanRechargeAt, 123456);
+  assert.equal(state.lastSurgeRechargeAt, 123456);
+});
+
+test('local save writes the current state and queues the same state for cloud sync', () => {
+  const state = { cash: 123, jobsCompleted: 4 };
+  let localValue = '';
+  let queued = null;
+  const save = gameFunction('saveState', {
+    state,
+    localStorage: { setItem: (key, value) => { assert.equal(key, 'delwin_v4_save'); localValue = value; } },
+    window: { DelWinCloud: { queueSave: (value) => { queued = value; } } }
+  });
+  save();
+  assert.deepEqual(JSON.parse(localValue), state);
+  assert.equal(queued, state);
+});
