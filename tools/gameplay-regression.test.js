@@ -672,3 +672,56 @@ test('job completion cannot bypass the repair, torque, or jack-release gates', (
   assert.equal(saves,1);
   assert.equal(modals,1);
 });
+
+
+test('night floodlights toggle safely and reject use after a call ends', () => {
+  const job = { floodlightsOn: false };
+  const state = { activeJob: job };
+  let renders = 0;
+  let clicks = 0;
+  const toggle = gameFunction('toggleBayFloodlights', {
+    state,
+    SoundFX: { torqueClick: () => { clicks += 1; } },
+    renderBay: () => { renders += 1; }
+  });
+  toggle();
+  assert.equal(job.floodlightsOn, true);
+  toggle();
+  assert.equal(job.floodlightsOn, false);
+  assert.equal(renders, 2);
+  assert.equal(clicks, 2);
+  state.activeJob = null;
+  toggle();
+  assert.equal(renders, 2);
+  assert.equal(clicks, 2);
+});
+
+test('wheel-lock key adapter only seats during stage two on an actually locked wheel', () => {
+  const job = { step: 1, hasWheelLock: true, lockKeyApplied: false };
+  const state = { activeJob: job };
+  const alerts = [];
+  let renders = 0;
+  const apply = gameFunction('applyWheelLockKey', {
+    state,
+    showBayActionHint: (action, step) => alerts.push(`stage-${step}`),
+    showAlert: (title) => alerts.push(title),
+    dismissAlert: () => {},
+    SoundFX: { torqueClick: () => {} },
+    renderBay: () => { renders += 1; }
+  });
+  apply();
+  assert.equal(job.lockKeyApplied, false);
+  assert.ok(alerts.includes('stage-2'));
+  job.step = 2;
+  job.hasWheelLock = false;
+  apply();
+  assert.equal(job.lockKeyApplied, false);
+  assert.ok(alerts.some(x => /NO SECURITY LOCK/.test(x)));
+  job.hasWheelLock = true;
+  apply();
+  assert.equal(job.lockKeyApplied, true);
+  assert.equal(renders, 1);
+  apply();
+  assert.equal(job.lockKeyApplied, true);
+  assert.ok(alerts.some(x => /KEY ALREADY SEATED/.test(x)));
+});
