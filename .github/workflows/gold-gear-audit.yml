@@ -1,0 +1,22 @@
+name: Gold Gear economy audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "game.js"
+      - "tools/simulate-gold-gears.js"
+  workflow_dispatch:
+
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Preview
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run source-aligned Gear simulation
+        run: node tools/simulate-gold-gears.js
