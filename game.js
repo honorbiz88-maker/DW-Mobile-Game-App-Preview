@@ -2485,35 +2485,52 @@ function renderLeague() {
 
 // --- 24 ZONES / 6 HUBS (Each Hub = Tool Tier) ---
 function renderZones() {
-  let currentHub = '';
+  const root = document.getElementById('zone-list');
+  if (!root) return;
   let html = '';
-  ZONES.forEach((z, idx) => {
-    const hubMeta = HUB_TIERS[Math.floor(idx / 4)] || HUB_TIERS[0];
-    const hubHeader = `${z.hub} · TOOL TIER ${hubMeta.toolTier} (${hubMeta.levels})`;
-    if (hubHeader !== currentHub) {
-      currentHub = hubHeader;
-      html += `<div class="hub-group-title">${currentHub}</div>`;
-    }
-    const unlocked = state.rep >= z.unlockRep;
-    const active = state.zoneId === z.id;
+  for (let hubIndex = 0; hubIndex < 6; hubIndex++) {
+    const hubZones = ZONES.slice(hubIndex * 4, hubIndex * 4 + 4);
+    if (!hubZones.length) continue;
+    const openCount = hubZones.filter(z => state.rep >= z.unlockRep).length;
+    const activeZone = hubZones.find(z => z.id === state.zoneId);
+    const nextZone = hubZones.find(z => state.rep < z.unlockRep);
+    const first = hubZones[0];
+    const last = hubZones[hubZones.length - 1];
+    const hubMeta = HUB_TIERS[hubIndex] || HUB_TIERS[0];
+    const progressStart = first.unlockRep;
+    const progressEnd = nextZone ? nextZone.unlockRep : last.unlockRep;
+    const progressPct = nextZone
+      ? Math.max(0, Math.min(100, ((state.rep - progressStart) / Math.max(1, progressEnd - progressStart)) * 100))
+      : 100;
     html += `
-      <div class="item-card" style="${active ? 'border-color:var(--amber);' : !unlocked ? 'opacity:0.78;' : ''}">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <div>
-            <span class="badge">ZONE ${idx + 1}/24 · ${z.mult.toFixed(2)}x PAYOUT · T${hubMeta.toolTier}</span>
-            <h3 style="font-size:15px;margin-top:4px;">${z.name}</h3>
-          </div>
-          <strong style="color:${unlocked ? 'var(--green)' : 'var(--muted)'};">
-            ${unlocked ? (active ? 'ACTIVE' : 'OPEN') : `🔒 ${z.unlockRep.toLocaleString()} REP`}
-          </strong>
+      <section class="territory-hub-panel ${activeZone ? 'is-active' : ''}">
+        <div class="territory-hub-head">
+          <div><span class="badge">REGION ${hubIndex + 1} · TOOL TIER ${hubMeta.toolTier}</span><h3>${first.hub}</h3></div>
+          <strong>${openCount}/4 OPEN</strong>
         </div>
-        <p style="font-size:12px;color:var(--muted);">${z.desc}</p>
-        <button type="button" class="primary-btn" ${!unlocked || active ? 'disabled' : ''} onclick="selectZone('${z.id}')">
-          ${active ? 'DEPLOYED HERE' : unlocked ? 'DEPLOY TO ZONE' : `UNLOCKS AT ${z.unlockRep.toLocaleString()} REP (YOU: ${state.rep.toLocaleString()})`}
-        </button>
-      </div>`;
-  });
-  document.getElementById('zone-list').innerHTML = html;
+        <div class="territory-hub-progress"><span style="width:${progressPct.toFixed(1)}%"></span></div>
+        <div class="territory-hub-meta"><span>${activeZone ? 'ACTIVE: ' + activeZone.name : nextZone ? 'NEXT: ' + nextZone.name : 'ALL TERRITORIES OPEN'}</span><strong>${nextZone ? (nextZone.unlockRep - state.rep).toLocaleString() + ' REP TO GO' : 'REGION MASTERED'}</strong></div>
+      </section>`;
+    hubZones.forEach((z, localIdx) => {
+      const idx = hubIndex * 4 + localIdx;
+      const unlocked = state.rep >= z.unlockRep;
+      const active = state.zoneId === z.id;
+      const distanceToUnlock = Math.max(0, z.unlockRep - state.rep);
+      html += `
+        <div class="item-card territory-zone-card ${active ? 'active-territory' : ''}" style="${!unlocked ? 'opacity:0.82;' : ''}">
+          <div class="territory-zone-top">
+            <div><span class="badge">ZONE ${idx + 1}/24 · ${z.mult.toFixed(2)}x PAYOUT</span><h3>${z.name}</h3></div>
+            <strong class="territory-zone-status ${unlocked ? 'open' : ''}">${active ? 'DEPLOYED' : unlocked ? 'AVAILABLE' : 'LOCKED'}</strong>
+          </div>
+          <p>${z.desc}</p>
+          <div class="territory-zone-details"><span>Rust exposure: ${Math.round(z.rustChance * 100)}%</span><span>${unlocked ? 'No REP gate' : distanceToUnlock.toLocaleString() + ' REP remaining'}</span></div>
+          <button type="button" class="primary-btn" ${!unlocked || active ? 'disabled' : ''} onclick="selectZone('${z.id}')">
+            ${active ? 'CURRENT OPERATING TERRITORY' : unlocked ? 'DEPLOY TO TERRITORY' : 'UNLOCK AT ' + z.unlockRep.toLocaleString() + ' REP'}
+          </button>
+        </div>`;
+    });
+  }
+  root.innerHTML = html;
 }
 
 function selectZone(id) {
