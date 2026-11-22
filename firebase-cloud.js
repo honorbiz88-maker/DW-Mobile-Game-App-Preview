@@ -8,12 +8,12 @@ import {
 } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyATtykiRuuWd1bUOg80NYfqPCcgZqVVCYs",
-  authDomain: "delwin-mobile-game.firebaseapp.com",
-  projectId: "delwin-mobile-game",
-  storageBucket: "delwin-mobile-game.firebasestorage.app",
-  messagingSenderId: "211403769437",
-  appId: "1:211403769437:web:097454c8d49caf91ab2fb4"
+  apiKey: "AIzaSyC59uf0Z6MAg3w_zedb_LMJovcqOZKEMe4",
+  authDomain: "delwin-mobile-game-overhaul.firebaseapp.com",
+  projectId: "delwin-mobile-game-overhaul",
+  storageBucket: "delwin-mobile-game-overhaul.firebasestorage.app",
+  messagingSenderId: "281542224196",
+  appId: "1:281542224196:web:d5e2747f3c7e9652cccf11"
 };
 
 const LOCAL_KEY = "delwin_v4_save";
