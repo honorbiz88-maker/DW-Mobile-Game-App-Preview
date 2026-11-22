@@ -74,7 +74,7 @@ test('cloud writes and conflict choices remain bound to the originating account'
   assert.match(cloudSource, /async function writeCloud\(payload, expectedUid = currentUser\?\.uid\)/);
   assert.match(cloudSource, /currentUser\.uid !== expectedUid/);
   assert.match(cloudSource, /doc\(db, "users", expectedUid, "saves", "current"\)/);
-  assert.match(cloudSource, /pendingConflict = \{ localRaw, cloudData, uid: currentUser\?\.uid \|\| null \}/);
+  assert.match(cloudSource, /pendingConflict = \{ localRaw, cloudData, uid: currentUser\?\.uid \|\| null, localOwnerUid \}/);
   assert.match(cloudSource, /pending\.uid !== currentUser\.uid/);
   assert.match(cloudSource, /await writeCloud\(JSON\.parse\(pending\.localRaw\), pending\.uid\);[\s\S]*?currentUser\.uid !== pending\.uid/);
   assert.match(cloudSource, /pendingConflict = null;[\s\S]*?busy = false;/);
