@@ -406,9 +406,11 @@ function getToolUpgradeSpec(key) {
   // Early Hook (4-5 calls) -> Early-Mid (8-10) -> Mid (20-25) -> Upper-Mid (50-60) -> Late (150-200) -> Endgame (300-350)
   const tierSteps = Math.floor((lvl - 1) / 4);
   const upperMidBoost = lvl >= 13 ? 1.14 : 1.0;
+  // The approved 20% discount applies only to the first four upgrade steps.
+  const earlyUpgradeDiscount = lvl <= 4 ? 0.80 : 1.0;
   const rawCost =
     tool.baseCost *
-    3.68 * 0.80 *
+    3.68 * earlyUpgradeDiscount *
     Math.pow(1.250, lvl - 1) *
     Math.pow(1.250, tierSteps) *
     upperMidBoost *
