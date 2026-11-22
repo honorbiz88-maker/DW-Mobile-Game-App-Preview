@@ -855,6 +855,10 @@ function renderContractBanner() {
   const c = state.contract;
   const ready = c.progress >= c.target;
   const pct = Math.min(100, Math.round((c.progress / c.target) * 100));
+  // Make the claim action unmistakable: an unclaimed contract blocks the next assignment.
+  box.style.borderColor = ready ? 'var(--green)' : 'var(--amber)';
+  box.style.background = ready ? 'linear-gradient(135deg, rgba(34,197,94,0.13), rgba(15,23,42,0.96))' : '';
+  box.style.boxShadow = ready ? '0 0 0 1px rgba(34,197,94,0.22), 0 8px 24px rgba(0,0,0,0.22)' : '';
   // Display the exact reward locked when this contract was assigned.
   const zMult = Number.isFinite(c.rewardZoneMult) ? c.rewardZoneMult : getZone().mult;
   const contractRank = Number.isFinite(c.rewardContractRank)
@@ -866,7 +870,7 @@ function renderContractBanner() {
   const displayedContractCash = Math.round(c.rewardCash * zMult * (1 + contractBonus));
   box.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;">
-      <span class="badge">📋 CONTRACT</span>
+      <span class="badge">${ready ? '✅ CONTRACT COMPLETE' : '📋 CONTRACT'}</span>
       <strong style="font-size:12px;color:var(--amber);">
         ${displayedContractCash} + ${c.rewardTokens}⚡${c.rewardPart ? ` + ${c.rewardPart}⚙️` : ''}
       </strong>
@@ -880,7 +884,10 @@ function renderContractBanner() {
     <div style="height:6px;background:#090c12;border-radius:99px;overflow:hidden;">
       <div style="height:100%;width:${pct}%;background:${ready ? 'var(--green)' : 'var(--amber)'};"></div>
     </div>
-    ${ready ? `<button class="primary-btn" onclick="claimContract()">CLAIM CONTRACT REWARD</button>` : ''}
+    ${ready
+      ? `<div role="status" aria-live="polite" style="margin-top:10px;padding:10px;border-radius:9px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.35);color:var(--green);font-size:12px;font-weight:800;text-align:center;">REWARD READY — CLAIM IT TO UNLOCK YOUR NEXT CONTRACT</div>
+         <button class="primary-btn" style="width:100%;min-height:48px;margin-top:8px;font-size:14px;font-weight:900;box-shadow:0 4px 16px rgba(34,197,94,0.2);" onclick="claimContract()">CLAIM REWARD · UNLOCK NEXT CONTRACT</button>`
+      : `<div style="margin-top:7px;font-size:11px;color:var(--muted);">Complete this objective to collect your reward and unlock the next contract.</div>`}
   `;
 }
 
