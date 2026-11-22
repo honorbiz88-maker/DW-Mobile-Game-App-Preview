@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "game.js"
+      - "index.html"
+      - "firebase-cloud.js"
       - "tools/gameplay-regression.test.js"
       - ".github/workflows/gameplay-regression.yml"
   pull_request:
@@ -25,3 +27,5 @@ jobs:
         run: node --test tools/gameplay-regression.test.js
       - name: Verify game JavaScript syntax
         run: node --check game.js
+      - name: Verify Firebase module syntax
+        run: node --check --input-type=module < firebase-cloud.js
