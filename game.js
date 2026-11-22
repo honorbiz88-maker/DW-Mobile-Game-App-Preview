@@ -1776,6 +1776,7 @@ function renderBay() {
     const iconTxt = isSecLock && !job.lockKeyApplied ? '🔑' : isSeized ? '🔩' : l.id;
     return `<button type="button" class="lug-btn ${isRemoved ? 'removed' : ''} ${isTorqued ? 'torqued' : ''} ${isSpinning ? 'spinning' : ''} ${isSeized ? 'rusted' : ''} ${lockClass} ${pulseLug ? 'tut-pulse' : ''}"
       style="left:${l.x}%;top:${l.y}%;"
+      aria-label="${isSecLock && !job.lockKeyApplied ? 'Wheel lock key lug ' : 'Wheel lug '}${l.id}${isRemoved ? ', removed' : isTorqued ? ', torqued' : ''}"
       onclick="tapLug(${l.id})">${iconTxt}</button>`;
   }).join('');
 
