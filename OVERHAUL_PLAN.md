@@ -101,7 +101,18 @@ Career milestones add up to 15 more by call 275. Contract Gears are additional a
 - Clean-streak and career Gear rewards can supply the 75-Gear progression requirement for engaged players; contract rewards add further Gears. Low-clean-rate players need more contract participation. These are expected-value estimates, not observed player telemetry.
 - Rig maintenance now has a capped operating-overhead effect (0–20%) and service costs $1.50 per condition point restored. It is a modest operating incentive, not a hard failure gate.
 - Dispatch estimates subtract the estimated replacement cost of the consumed supply. The estimate excludes performance bonuses and penalties by design.
-- A provisional cash-flow simulation indicates that full max-level progression is a multi-thousand-call career. The estimate assumes 70% fast completions, 5-star rating, two free Surges used per day, one contract claimed about every 10 calls, strategic territory selection, and estimated contract/VIP value. It is sensitive to actual play frequency, contract cadence, Surge use, penalties, and inventory behavior; use it as a pacing warning, not a release promise.
+- A provisional cash-flow simulation indicates that full max-level progression is a multi-thousand-call career. The estimate assumes 70% fast completions, Elite 5-star payout tier, 75% clean calls for Gear yield, two free Surges used per day, one contract claimed about every 10 calls, strategic territory selection, and estimated contract/VIP value. It is sensitive to actual play frequency, contract cadence, Surge use, penalties, and inventory behavior; use it as a pacing warning, not a release promise.
+
+| Calls per day | Modeled calls to max progression | Modeled calendar days |
+|---:|---:|---:|
+| 3 | 1,995 | 665 |
+| 5 | 2,343 | 469 |
+| 10 | 2,706 | 271 |
+| 15 | 2,859 | 191 |
+| 25 | 2,993 | 120 |
+| 40 | 3,076 | 77 |
+
+The model treats free Surge use as up to two charges per day and approximates VIP selection and contract cash/REP as expected values. It does not model real player behavior or claim timing. The large modeled Gear surplus suggests cash, not Gold Gears, is the primary late-game pacing constraint under these assumptions.
 
 ### Remaining validation
 
