@@ -2,7 +2,7 @@
 // Full Build with:
 // - Hub-aligned Tool Tiers (Hubs 1-6 map directly to Tool Tiers 1-6 across 24 zones)
 // - Calibrated Gradual Milestone Curve: Early Hook (4-5 calls) -> Early-Mid (8-10) -> Mid (20-25) -> Upper-Mid (50-60) -> Late (150-200) -> Endgame (300-350)
-// - Tightened 3-call clean-streak Gold Gear interval + streak milestone bonuses (9 -> +2, 15 -> +3)
+// - Scarce Gold Gear progression: one 20-clean-call streak reward; career and contract milestones
 // - Zero broken-image text flash (empty alt + cached src swap)
 // - Press-and-Hold smooth PSI inflation & bleeding (eliminates mobile double-tap zoom)
 // - Top currency pills ($ Cash, ⚙️ Gold Gears, ⚡ Tokens) linked directly to Dispatch Shop
@@ -156,8 +156,8 @@ const CONTRACT_POOL = [
   { id: 'c_clean4', title: 'Zero-Penalty Streak', desc: 'Complete 4 calls with $0 protocol or safety penalties.', type: 'clean_streak', target: 4, rewardCash: 185, rewardTokens: 2, rewardPart: 0, rewardRep: 95 },
   { id: 'c_plug3', title: 'Crown Plug Specialist', desc: 'Properly plug 3 center-tread nail punctures.', type: 'plugs', target: 3, rewardCash: 150, rewardTokens: 1, rewardPart: 0, rewardRep: 80 },
   { id: 'c_swap3', title: 'Casing Replacement Pro', desc: 'Complete 3 tire swaps (Standard or Heavy-Duty).', type: 'swaps', target: 3, rewardCash: 210, rewardTokens: 2, rewardPart: 0, rewardRep: 105 },
-  { id: 'c_fast3', title: 'Rapid Highway Response', desc: 'Finish 3 calls with ≥45% SLA timer remaining.', type: 'fast', target: 3, rewardCash: 225, rewardTokens: 2, rewardPart: 1, rewardRep: 120 },
-  { id: 'c_heavy2', title: 'Commercial Fleet Rescue', desc: 'Service 2 Box Trucks or 18-Wheelers with HD tires.', type: 'heavy', target: 2, rewardCash: 280, rewardTokens: 3, rewardPart: 1, rewardRep: 145 }
+  { id: 'c_fast3', title: 'Rapid Highway Response', desc: 'Finish 3 calls with ≥45% SLA timer remaining.', type: 'fast', target: 3, rewardCash: 225, rewardTokens: 2, rewardPart: 0, rewardRep: 120 },
+  { id: 'c_heavy2', title: 'Commercial Fleet Rescue', desc: 'Service 2 Box Trucks or 18-Wheelers with HD tires.', type: 'heavy', target: 2, rewardCash: 280, rewardTokens: 3, rewardPart: 0, rewardRep: 145 }
 ];
 
 const LUG_COORDS = [
@@ -177,10 +177,10 @@ const MAX_SURGE_CHARGES = 3;
 const SURGE_RECHARGE_MS = 12 * 60 * 60 * 1000;
 
 
-// Tightened 3-call clean-streak Gold Gear interval + streak milestone bonuses
-const CLEAN_STREAK_GEAR_INTERVAL = 3;
-const STREAK_GEAR_MILESTONES = { 9: 2, 15: 3 };
-const MAX_STREAK_ROLLOVER = 15;
+// Gold Gears are a scarce progression currency: reward only a sustained 20-call clean streak.
+const CLEAN_STREAK_GEAR_INTERVAL = 20;
+const STREAK_GEAR_MILESTONES = { 20: 1 };
+const MAX_STREAK_ROLLOVER = 20;
 
 let state = {
   bizName: 'DelWin Mobile Tire Rescue',
@@ -816,7 +816,7 @@ function claimContract() {
   state.parts += c.rewardPart || 0;
   state.rep += repWon;
   state.contractsCompleted = (state.contractsCompleted || 0) + 1;
-  // A steady career reward: every fifth completed contract grants one Gold Gear.
+  // A measured career reward: one Gold Gear every fifth completed contract.
   const contractCareerGear = state.contractsCompleted % 5 === 0 ? 1 : 0;
   if (contractCareerGear) state.parts += contractCareerGear;
   rollNewContract();
@@ -2271,7 +2271,7 @@ function completeJob() {
   if (isCleanJob) state.streak = (state.streak || 0) + 1;
   else state.streak = 0;
 
-  // Tightened 3-call clean-streak Gold Gear drops + 9/15 streak milestones
+  // One Gold Gear for a full 20-call clean streak; ordinary 3/6/9/12-call streaks grant no Gears.
   const earnedStreakGear = isCleanJob ? getStreakGearReward(state.streak) : 0;
   if (earnedStreakGear > 0) {
     state.parts += earnedStreakGear;
