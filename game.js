@@ -55,7 +55,7 @@ const HUB_TIERS = [
 
 const RIG_TIERS = [
   { tier: 1, name: 'Tier 1: Novice Roadside Van', img: 'assets/rig-t1.png', color: '#cbd5e1', reqLvl: 1, req: 'Starting Rig', cashCost: 0, partCost: 0, tokenCost: 0, mult: 1.00, capPlugs: 6, capStd: 3, capHd: 1, perk: 'Standard highway response rig (1.00x Payouts).' },
-  { tier: 2, name: 'Tier 2: Intermediate Utility Pickup', img: 'assets/rig-t2.png', color: '#38bdf8', reqLvl: 5, req: 'All Tools Lvl 5+', cashCost: 2200, partCost: 1, tokenCost: 0, mult: 1.12, capPlugs: 9, capStd: 4, capHd: 2, perk: '1.12x Base Payouts & Twin Amber Strobes.' },
+  { tier: 2, name: 'Tier 2: Intermediate Utility Pickup', img: 'assets/rig-t2.png', color: '#38bdf8', reqLvl: 5, req: 'All Tools Lvl 5+', cashCost: 1800, partCost: 1, tokenCost: 0, mult: 1.12, capPlugs: 9, capStd: 4, capHd: 2, perk: '1.12x Base Payouts & Twin Amber Strobes.' },
   { tier: 3, name: 'Tier 3: Pro Extended Tire Truck', img: 'assets/rig-t3.png', color: '#f59e0b', reqLvl: 9, req: 'All Tools Lvl 9+', cashCost: 9500, partCost: 2, tokenCost: 0, mult: 1.25, capPlugs: 12, capStd: 6, capHd: 3, perk: '1.25x Base Payouts & Exterior Spare Tire Rack.' },
   { tier: 4, name: 'Tier 4: Commercial Dually Rig', img: 'assets/rig-t4.png', color: '#a855f7', reqLvl: 13, req: 'All Tools Lvl 13+', cashCost: 36000, partCost: 3, tokenCost: 0, mult: 1.40, capPlugs: 16, capStd: 8, capHd: 4, perk: '1.40x Base Payouts & Dual-Wheel Hydraulic Lift.' },
   { tier: 5, name: 'Tier 5: Heavy-Duty Fleet Rescue Box', img: 'assets/rig-t5.png', color: '#ef4444', reqLvl: 17, req: 'All Tools Lvl 17+', cashCost: 135000, partCost: 4, tokenCost: 0, mult: 1.56, capPlugs: 22, capStd: 10, capHd: 6, perk: '1.56x Base Payouts & Commercial Fleet Priority.' },
@@ -247,8 +247,15 @@ function loadState() {
           parsed.stdTires = parsed.tires;
         }
         const savedTools = parsed.tools && typeof parsed.tools === 'object' ? parsed.tools : null;
+        const hasCareerGearClaims = Array.isArray(parsed.claimedCareerGearMilestones);
         delete parsed.tools;
         Object.assign(state, parsed);
+        // Legacy saves predate career Gear claims. Mark milestones already reached
+        // as claimed so the new reward system cannot pay them a second time.
+        if (!hasCareerGearClaims) {
+          state.claimedCareerGearMilestones = [10,30,60,100,175,275]
+            .filter((m) => (state.jobsCompleted || 0) >= m);
+        }
         if (savedTools) {
           Object.keys(state.tools).forEach((k) => {
             if (savedTools[k] && typeof savedTools[k].level === 'number') {
