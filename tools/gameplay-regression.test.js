@@ -1633,13 +1633,23 @@ test('cloud restore overrides a boot-normalized device save and keeps it only as
   assert.equal(h.store.get('delwin_cloud_owner_uid'), 'account-B');
   assert.deepEqual(JSON.parse(h.store.get('delwin_v4_save')), cloudCareer,
     'The cloud career must replace any startup-normalized device payload');
-  assert.equal(h.store.has('delwin_cloud_restore_pending'), false,
-    'The marker clears only after the authoritative cloud payload is written locally');
+  assert.equal(h.store.has('delwin_cloud_restore_pending'), true,
+    'Keep the marker across reload so boot cannot rewrite the restored payload before auth reconciliation');
   assert.equal(h.timers.size, false, 'The device payload must never be queued over the cloud career');
   const backupKey = Array.from(h.store.keys()).find(key => key.startsWith('delwin_backup_restore-reconciliation_'));
   assert.ok(backupKey, 'Preserve the divergent startup/device save as a backup');
   assert.deepEqual(JSON.parse(h.store.get(backupKey)), normalizedLocalCareer);
   assert.equal(h.calls.reloads, 1, 'Reload the game with the exact restored cloud payload');
+  const second = cloudModuleHarness({
+    local: Object.fromEntries(h.store.entries()),
+    cloud: Object.fromEntries(h.cloudDocs.entries()),
+    user: { uid: 'account-B', email: 'b@example.com' }
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(second.store.has('delwin_cloud_restore_pending'), false,
+    'Clear the marker only after a fresh boot sees the exact cloud payload');
+  assert.deepEqual(JSON.parse(second.store.get('delwin_v4_save')), cloudCareer);
+  assert.equal(second.calls.modal, '', 'The post-restore reload must not reopen the conflict');
 });
 
 test('a fresh device restores a valid cloud career and records its account owner', async () => {
