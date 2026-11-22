@@ -2970,6 +2970,13 @@ function renderZones() {
 }
 
 function selectZone(id) {
+  if (state.activeJob) {
+    showAlert('ACTIVE CALL IN PROGRESS', 'Complete or leave the current roadside call before changing operating territories.');
+    goPage('bay');
+    return;
+  }
+  const targetZone = ZONES.find((zone) => zone.id === id);
+  if (!targetZone || state.rep < targetZone.unlockRep) return;
   state.zoneId = id;
   SoundFX.torqueClick();
   saveState();
