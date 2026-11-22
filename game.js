@@ -394,14 +394,30 @@ function getSupplyReplacementCost(job) {
   return job.veh && job.veh.heavy ? pricing.hdCost : pricing.stdCost;
 }
 
+function getRigConditionSurcharge() {
+  const savedCondition = Number.isFinite(state.rigCondition) ? state.rigCondition : 100;
+  const condition = Math.max(0, Math.min(100, savedCondition));
+  if (condition >= 80) return 0;
+  if (condition >= 60) return 0.05;
+  if (condition >= 40) return 0.10;
+  if (condition >= 20) return 0.15;
+  return 0.20;
+}
+
+function getRigServiceCost(condition = state.rigCondition) {
+  const safeCondition = Math.max(0, Math.min(100, Number.isFinite(condition) ? condition : 100));
+  return Math.ceil((100 - safeCondition) * 1.5);
+}
+
 function getFleetOverheadFee(job) {
-  // Once a dispatch is generated, preserve its quoted operating overhead.
-  // This keeps the job invoice stable if the player later changes territory or rig.
+  // Once a dispatch is generated, preserve its quoted operating overhead,
+  // including the rig-condition surcharge in effect when the call was offered.
   if (job && Number.isFinite(job.operatingOverhead)) return job.operatingOverhead;
   const rig = getActiveRigObj();
   const z = getZone();
   const heavyFactor = job && job.veh && job.veh.heavy ? 1.25 : 1.0;
-  return Math.round(12 * rig.mult * z.mult * heavyFactor);
+  const conditionMultiplier = 1 + getRigConditionSurcharge();
+  return Math.round(12 * rig.mult * z.mult * heavyFactor * conditionMultiplier);
 }
 
 function getRatingAvg() {
@@ -2411,8 +2427,8 @@ function serviceActiveRig() {
     showAlert('FLEET READY', 'Your active rig is already at full condition.');
     return;
   }
-  // Keep the actual charge identical to the garage quote, including fractional wear.
-  const cost = Math.ceil((100 - condition) * 4);
+  // Maintenance pricing is intentionally affordable; wear has a modest, visible overhead effect.
+  const cost = getRigServiceCost(condition);
   if (state.cash < cost) {
     showAlert('SERVICE FUNDING REQUIRED', `This maintenance visit costs ${cost.toLocaleString()}. Complete more calls to build your service reserve.`);
     return;
@@ -2423,7 +2439,7 @@ function serviceActiveRig() {
   updateHUD();
   renderGarage();
   SoundFX.success();
-  showAlert('RIG SERVICE COMPLETE', `Your active rig has been restored to 100% condition for ${cost.toLocaleString()}.`);
+  showAlert('RIG SERVICE COMPLETE', `Your active rig has been restored to 100% condition for ${cost.toLocaleString()}. New dispatches will use the lower operating overhead.`);
 }
 
 function renderGarage() {
@@ -2479,8 +2495,9 @@ function renderGarage() {
     <div class="fleet-condition-panel">
       <div class="fleet-condition-head"><span>ACTIVE RIG CONDITION</span><strong>${Math.round(state.rigCondition)}%</strong></div>
       <div class="fleet-condition-track"><span style="width:${Math.max(0,Math.min(100,state.rigCondition))}%;background:${state.rigCondition < 30 ? '#fb7185' : state.rigCondition < 60 ? '#fbbf24' : '#34d399'}"></span></div>
-      <small>${state.rigCondition >= 80 ? 'Fleet-ready · routine wear only' : state.rigCondition >= 40 ? 'Service recommended · wear is accumulating' : 'Maintenance due · schedule a fleet service'}</small>
-      <button type="button" class="secondary-btn" onclick="serviceActiveRig()" ${state.rigCondition >= 100 ? 'disabled' : ''}>SERVICE ACTIVE RIG · ${Math.ceil((100-state.rigCondition)*4)}</button>
+      <small>${getRigConditionSurcharge() === 0 ? 'Fleet-ready · no condition surcharge' : `Wear surcharge: +${Math.round(getRigConditionSurcharge()*100)}% operating overhead per new call`}</small>
+      <small>Condition drops 1.5% per standard call and 2.5% per heavy call. Service restores 100%.</small>
+      <button type="button" class="secondary-btn" onclick="serviceActiveRig()" ${state.rigCondition >= 100 ? 'disabled' : ''}>SERVICE ACTIVE RIG · ${getRigServiceCost()}</button>
     </div>
     <div style="font-size:11px;color:var(--amber);font-weight:800;">
       Hub ${currentHub.hubNum} (${currentHub.name}) → Tool Tier ${currentHub.toolTier} (${currentHub.levels}) · Cargo: ${rig.capStd} Std / ${rig.capHd} HD / ${rig.capPlugs} Plugs
