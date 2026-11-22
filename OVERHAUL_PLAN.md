@@ -135,7 +135,7 @@ The first Tier 2 Gear threshold is reached around call 60 in typical and rough s
 A fresh source-aligned, seeded Monte Carlo model was run against the **reduced** reward schedule. This replaces the pre-reduction Gear surplus figures and tests the actual contract objective pool rather than assuming a fixed contract every 7–8 calls.
 
 Model behavior and limits:
-- 5,000 seeded careers per scenario were simulated to 2,600 calls; 2,000 seeded careers per scenario were simulated to the 75-Gear target. The reproducible harness is `tools/simulate-gold-gears.js` (`node tools/simulate-gold-gears.js`).
+- 5,000 seeded careers per scenario were simulated to 2,600 calls; 2,000 seeded careers per scenario were simulated to the 75-Gear target. The reproducible harness is `tools/simulate-gold-gears.js` (`node tools/simulate-gold-gears.js`); `.github/workflows/gold-gear-audit.yml` runs it when the game or simulator source changes.
 - The model starts with the game's initial 4-clean-call contract. Subsequent contracts are selected uniformly from the available pool, excluding the just-completed contract; Heavy contracts enter the pool only after Tier 2 is unlocked.
 - It models the source objective targets: 4 consecutive clean calls, 3 plugs, 3 swaps, 3 fast calls, or 2 Heavy vehicle swaps. Damage is modeled at the source pool ratio (20% plug / 80% swap); after Tier 2, Heavy vehicles are 2 of 5 vehicle types (40%).
 - Clean-call and fast-call probabilities are scenario inputs. Calls are independent in the model. The 20-call clean streak resets on a non-clean call and awards one Gear at 20.
