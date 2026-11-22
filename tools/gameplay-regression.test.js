@@ -969,3 +969,125 @@ test('new contract rolls exclude the previous contract and unavailable heavy obj
   assert.equal(state.contract.rewardBonusRate,0.10);
   assert.equal(randomCalls,1);
 });
+
+
+test('tool upgrade rejects insufficient cash and Gold Gears without mutating career state', () => {
+  const tool={level:4,name:'Impact Wrench'};
+  const state={tools:{impact:tool},cash:500,parts:0};
+  const alerts=[];
+  let saves=0,renders=0;
+  const upgrade=gameFunction('upgradeTool',{
+    state,getToolUpgradeSpec:()=>({cost:1000,gears:1}),
+    showAlert:(title)=>alerts.push(title),SoundFX:{success:()=>{}},
+    saveState:()=>{saves++;},updateHUD:()=>{},renderGarage:()=>{renders++;},
+    previewToolTiers:{}
+  });
+  upgrade('impact');
+  assert.equal(state.cash,500);
+  assert.equal(state.parts,0);
+  assert.equal(tool.level,4);
+  assert.ok(alerts.some(x=>/INSUFFICIENT CASH/.test(x)));
+  state.cash=2000;
+  upgrade('impact');
+  assert.equal(state.cash,2000);
+  assert.equal(state.parts,0);
+  assert.equal(tool.level,4);
+  assert.ok(alerts.some(x=>/GOLD GEARS REQUIRED/.test(x)));
+  assert.equal(saves,0);
+  assert.equal(renders,0);
+});
+
+test('successful breakthrough upgrade spends exact cash and one Gear exactly once', () => {
+  const tool={level:4,name:'Impact Wrench'};
+  const state={tools:{impact:tool},cash:2500,parts:1};
+  let saves=0,renders=0;
+  const previewToolTiers={};
+  const upgrade=gameFunction('upgradeTool',{
+    state,getToolUpgradeSpec:()=>({cost:1800,gears:1}),
+    showAlert:()=>{},SoundFX:{success:()=>{}},
+    saveState:()=>{saves++;},updateHUD:()=>{},renderGarage:()=>{renders++;},
+    previewToolTiers
+  });
+  upgrade('impact');
+  assert.equal(state.cash,700);
+  assert.equal(state.parts,0);
+  assert.equal(tool.level,5);
+  assert.equal(previewToolTiers.impact,2);
+  upgrade('impact');
+  assert.equal(state.cash,700);
+  assert.equal(state.parts,0);
+  assert.equal(tool.level,5);
+  assert.equal(saves,1);
+  assert.equal(renders,1);
+});
+
+test('tool upgrade refuses unknown tools and level-cap purchases', () => {
+  const state={tools:{impact:{level:24,name:'Impact Wrench'}},cash:999999,parts:99};
+  let saves=0;
+  const upgrade=gameFunction('upgradeTool',{
+    state,getToolUpgradeSpec:()=>({cost:1,gears:0}),showAlert:()=>{},
+    SoundFX:{success:()=>{}},saveState:()=>{saves++;},updateHUD:()=>{},
+    renderGarage:()=>{},previewToolTiers:{}
+  });
+  upgrade('unknown');
+  upgrade('impact');
+  assert.equal(state.tools.impact.level,24);
+  assert.equal(state.cash,999999);
+  assert.equal(state.parts,99);
+  assert.equal(saves,0);
+});
+
+test('rig commission enforces sequential tier, all-tool milestone, cash and Gear requirements', () => {
+  const rigs=[
+    {name:'Rig 1',reqLvl:1,cashCost:0,partCost:0,perk:'base',capStd:3,capHd:1,capPlugs:6},
+    {name:'Rig 2',reqLvl:5,cashCost:1800,partCost:1,perk:'upgrade',capStd:4,capHd:2,capPlugs:9},
+    {name:'Rig 3',reqLvl:9,cashCost:9500,partCost:2,perk:'advanced',capStd:6,capHd:3,capPlugs:12}
+  ];
+  const state={unlockedRigTier:1,cash:1000,parts:0};
+  const alerts=[];
+  let saves=0,renders=0,modals=0;
+  const minLevels={impact:5,jack:5,comp:5,radar:4};
+  const commission=gameFunction('purchaseRigTier',{
+    state,RIG_TIERS:rigs,getMinToolLevel:()=>Math.min(...Object.values(minLevels)),
+    showAlert:title=>alerts.push(title),SoundFX:{success:()=>{}},
+    saveState:()=>{saves++;},updateHUD:()=>{},renderGarage:()=>{},
+    openModal:()=>{modals++;}
+  });
+  commission(3);
+  assert.equal(state.unlockedRigTier,1);
+  assert.ok(alerts.some(x=>/SEQUENTIAL RIG UNLOCK/.test(x)));
+  commission(2);
+  assert.equal(state.unlockedRigTier,1);
+  assert.ok(alerts.some(x=>/TOOL MILESTONE REQUIRED/.test(x)));
+  minLevels.radar=5;
+  commission(2);
+  assert.equal(state.unlockedRigTier,1);
+  assert.ok(alerts.some(x=>/INSUFFICIENT RIG COMMISSION RESOURCES/.test(x)));
+  assert.equal(saves,0);
+  assert.equal(modals,0);
+});
+
+test('rig commission deducts exact resources once and cannot re-commission an unlocked tier', () => {
+  const rigs=[
+    {name:'Rig 1',reqLvl:1,cashCost:0,partCost:0,perk:'base',capStd:3,capHd:1,capPlugs:6},
+    {name:'Rig 2',reqLvl:5,cashCost:1800,partCost:1,perk:'upgrade',capStd:4,capHd:2,capPlugs:9}
+  ];
+  const state={unlockedRigTier:1,cash:2000,parts:1};
+  let saves=0,renders=0,modals=0;
+  const commission=gameFunction('purchaseRigTier',{
+    state,RIG_TIERS:rigs,getMinToolLevel:()=>5,showAlert:()=>{},
+    SoundFX:{success:()=>{}},saveState:()=>{saves++;},updateHUD:()=>{},
+    renderGarage:()=>{renders++;},openModal:()=>{modals++;}
+  });
+  commission(2);
+  assert.equal(state.unlockedRigTier,2);
+  assert.equal(state.cash,200);
+  assert.equal(state.parts,0);
+  commission(2);
+  assert.equal(state.unlockedRigTier,2);
+  assert.equal(state.cash,200);
+  assert.equal(state.parts,0);
+  assert.equal(saves,1);
+  assert.equal(renders,1);
+  assert.equal(modals,1);
+});
