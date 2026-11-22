@@ -1720,6 +1720,27 @@ function renderBay() {
         <button type="button" class="primary-btn tut-pulse" style="background:var(--green);" onclick="lowerJackAndFinish()">⬇️ LOWER JACK & STOW CONES</button>`;
     }
   }
+
+  const stepNames = ['Safety setup', 'Remove wheel', 'Diagnose & repair', 'Calibrate PSI', 'Torque & release'];
+  const currentStep = Math.max(1, Math.min(5, job.step || 1));
+  const completedSteps = currentStep - 1;
+  let progressEl = document.getElementById('repair-progress-panel');
+  if (!progressEl) {
+    progressEl = document.createElement('section');
+    progressEl.id = 'repair-progress-panel';
+    progressEl.className = 'repair-progress-panel';
+    ctrl.parentNode.insertBefore(progressEl, ctrl);
+  }
+  const issueCount = (job.penaltyLog || []).length;
+  progressEl.innerHTML = `
+    <div class="repair-progress-head">
+      <div><span class="badge">SERVICE CHECKLIST</span><strong>Stage ${currentStep} of 5</strong></div>
+      <span class="repair-issue-count ${issueCount ? 'has-issues' : ''}">${issueCount ? issueCount + ' ISSUE' + (issueCount === 1 ? '' : 'S') : 'NO PENALTIES'}</span>
+    </div>
+    <div class="repair-progress-track">${stepNames.map((name, idx) => `<span class="${idx < completedSteps ? 'done' : idx === completedSteps ? 'active' : ''}"></span>`).join('')}</div>
+    <div class="repair-progress-foot"><span>${stepNames[currentStep - 1]}</span><span>${completedSteps}/5 complete</span></div>
+    ${issueCount ? `<div class="repair-issue-detail">${(job.penaltyLog || []).slice(-2).map(p => `<div><span>${p.reason}</span><strong>-${p.amount}</strong></div>`).join('')}</div>` : '<div class="repair-clean-note">Keep the workflow clean to protect your customer rating and clean-call streak.</div>'}
+  `;
 }
 
 // --- PRESS & HOLD AIR INFLATION / BLEEDING ---
