@@ -445,8 +445,8 @@ const RIG_TIERS = [
   { tier: 2, name: 'Tier 2: Intermediate Utility Pickup', img: 'assets/rig-t2.png', color: '#38bdf8', reqLvl: 5, req: 'All Tools Lvl 5+', cashCost: 1800, partCost: 1, tokenCost: 0, mult: 1.12, capPlugs: 9, capStd: 4, capHd: 2, perk: '1.12x Base Payouts & Twin Amber Strobes.' },
   { tier: 3, name: 'Tier 3: Pro Extended Tire Truck', img: 'assets/rig-t3.png', color: '#f59e0b', reqLvl: 9, req: 'All Tools Lvl 9+', cashCost: 9500, partCost: 2, tokenCost: 0, mult: 1.25, capPlugs: 12, capStd: 6, capHd: 3, perk: '1.25x Base Payouts & Exterior Spare Tire Rack.' },
   { tier: 4, name: 'Tier 4: Commercial Dually Rig', img: 'assets/rig-t4.png', color: '#a855f7', reqLvl: 13, req: 'All Tools Lvl 13+', cashCost: 36000, partCost: 3, tokenCost: 0, mult: 1.40, capPlugs: 16, capStd: 8, capHd: 4, perk: '1.40x Base Payouts & Dual-Wheel Hydraulic Lift.' },
-  { tier: 5, name: 'Tier 5: Heavy-Duty Fleet Rescue Box', img: 'assets/rig-t5.png', color: '#ef4444', reqLvl: 17, req: 'All Tools Lvl 17+', cashCost: 135000, partCost: 4, tokenCost: 0, mult: 1.56, capPlugs: 22, capStd: 10, capHd: 6, perk: '1.56x Base Payouts & Commercial Fleet Priority.' },
-  { tier: 6, name: 'Tier 6: Master Apex Syndicate Flagship', img: 'assets/rig-t6.png', color: '#fde047', reqLvl: 21, req: 'All Tools Lvl 21+', cashCost: 450000, partCost: 5, tokenCost: 0, mult: 1.74, capPlugs: 30, capStd: 14, capHd: 8, perk: '1.74x Base Payouts & Maximum Corridor Prestige.' }
+  { tier: 5, name: 'Tier 5: Heavy-Duty Fleet Rescue Box', img: 'assets/rig-t5.png', color: '#ef4444', reqLvl: 17, req: 'All Tools Lvl 17+', cashCost: 108000, partCost: 4, tokenCost: 0, mult: 1.56, capPlugs: 22, capStd: 10, capHd: 6, perk: '1.56x Base Payouts & Commercial Fleet Priority.' },
+  { tier: 6, name: 'Tier 6: Master Apex Syndicate Flagship', img: 'assets/rig-t6.png', color: '#fde047', reqLvl: 21, req: 'All Tools Lvl 21+', cashCost: 360000, partCost: 5, tokenCost: 0, mult: 1.74, capPlugs: 30, capStd: 14, capHd: 8, perk: '1.74x Base Payouts & Maximum Corridor Prestige.' }
 ];
 
 const ZONES = [
