@@ -26,7 +26,7 @@ function verifyModelMatchesGame() {
   assert.ok(source.includes('state.contractsCompleted % 6 === 0 ? 1 : 0'), 'contract Gear interval changed');
   assert.ok(source.includes('const careerGearAwards = {10:1,30:2,60:2,100:3,175:3,275:4};'), 'career milestone table changed');
 
-  const pool = source.match(/const CONTRACT_POOL = \[([\\s\\S]*?)\\n\\];/);
+  const pool = source.match(/const CONTRACT_POOL = \[([\s\S]*?)\n\\];/);
   assert.ok(pool, 'could not locate contract pool');
   const rewardParts = pool[1].match(/rewardPart: 0/g) || [];
   assert.equal(rewardParts.length, 5, 'contract pool should contain five zero-direct-Gear rewards');
