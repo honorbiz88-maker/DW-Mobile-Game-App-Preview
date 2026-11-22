@@ -279,6 +279,12 @@ function loadState() {
     }
     if (!ZONES.some((z) => z.id === state.zoneId)) state.zoneId = 'z1';
     if (!state.contract || typeof state.contract !== 'object') rollNewContract();
+    // Backfill reward snapshots for contracts already in existing player saves.
+    if (!Number.isFinite(state.contract.rewardZoneMult)) state.contract.rewardZoneMult = getZone().mult;
+    if (!Number.isFinite(state.contract.rewardContractRank)) state.contract.rewardContractRank = Math.max(1, (state.contractsCompleted || 0) + 1);
+    if (!Number.isFinite(state.contract.rewardBonusRate)) {
+      state.contract.rewardBonusRate = Math.min(0.30, Math.floor((state.contract.rewardContractRank - 1) / 2) * 0.05);
+    }
     if (!state.bizName) state.bizName = 'DelWin Mobile Tire Rescue';
     if (!state.avatarEmoji) state.avatarEmoji = '🛞';
     if (!state.unlockedRigTier) state.unlockedRigTier = 1;
@@ -374,6 +380,9 @@ function getStockPricing() {
 }
 
 function getFleetOverheadFee(job) {
+  // Once a dispatch is generated, preserve its quoted operating overhead.
+  // This keeps the job invoice stable if the player later changes territory or rig.
+  if (job && Number.isFinite(job.operatingOverhead)) return job.operatingOverhead;
   const rig = getActiveRigObj();
   const z = getZone();
   const heavyFactor = job && job.veh && job.veh.heavy ? 1.25 : 1.0;
@@ -659,6 +668,12 @@ function loadState() {
     }
     if (!ZONES.some((z) => z.id === state.zoneId)) state.zoneId = 'z1';
     if (!state.contract || typeof state.contract !== 'object') rollNewContract();
+    // Backfill reward snapshots for contracts already in existing player saves.
+    if (!Number.isFinite(state.contract.rewardZoneMult)) state.contract.rewardZoneMult = getZone().mult;
+    if (!Number.isFinite(state.contract.rewardContractRank)) state.contract.rewardContractRank = Math.max(1, (state.contractsCompleted || 0) + 1);
+    if (!Number.isFinite(state.contract.rewardBonusRate)) {
+      state.contract.rewardBonusRate = Math.min(0.30, Math.floor((state.contract.rewardContractRank - 1) / 2) * 0.05);
+    }
     if (!state.bizName) state.bizName = 'DelWin Mobile Tire Rescue';
     if (!state.avatarEmoji) state.avatarEmoji = '🛞';
     if (!state.unlockedRigTier) state.unlockedRigTier = 1;
@@ -754,6 +769,9 @@ function getStockPricing() {
 }
 
 function getFleetOverheadFee(job) {
+  // Once a dispatch is generated, preserve its quoted operating overhead.
+  // This keeps the job invoice stable if the player later changes territory or rig.
+  if (job && Number.isFinite(job.operatingOverhead)) return job.operatingOverhead;
   const rig = getActiveRigObj();
   const z = getZone();
   const heavyFactor = job && job.veh && job.veh.heavy ? 1.25 : 1.0;
@@ -1112,16 +1130,31 @@ function rollNewContract() {
   const currentId = state.contract ? state.contract.id : '';
   const options = CONTRACT_POOL.filter((c) => c.id !== currentId);
   const pick = options[Math.floor(Math.random() * options.length)];
-  state.contract = { ...pick, progress: 0 };
+  const contractRank = Math.max(1, (state.contractsCompleted || 0) + 1);
+  const contractBonusRate = Math.min(0.30, Math.floor((contractRank - 1) / 2) * 0.05);
+  state.contract = {
+    ...pick,
+    progress: 0,
+    // Lock reward economics when the contract is issued, not when it is claimed.
+    rewardZoneMult: getZone().mult,
+    rewardContractRank: contractRank,
+    rewardBonusRate: contractBonusRate
+  };
 }
 
 function claimContract() {
   const c = state.contract;
   if (!c || c.progress < c.target) return;
   SoundFX.success();
-  const zMult = getZone().mult;
-  const contractRank = Math.max(1, (state.contractsCompleted || 0) + 1);
-  const contractBonusRate = Math.min(0.30, Math.floor((contractRank - 1) / 2) * 0.05);
+  // Older saves may contain a contract issued before reward snapshots existed.
+  // Preserve their current-zone value once as a migration fallback.
+  const zMult = Number.isFinite(c.rewardZoneMult) ? c.rewardZoneMult : getZone().mult;
+  const contractRank = Number.isFinite(c.rewardContractRank)
+    ? c.rewardContractRank
+    : Math.max(1, (state.contractsCompleted || 0) + 1);
+  const contractBonusRate = Number.isFinite(c.rewardBonusRate)
+    ? c.rewardBonusRate
+    : Math.min(0.30, Math.floor((contractRank - 1) / 2) * 0.05);
   const cashWon = Math.round(c.rewardCash * zMult * (1 + contractBonusRate));
   const repWon = Math.round(c.rewardRep * zMult * (1 + contractBonusRate));
   state.cash += cashWon;
@@ -1625,6 +1658,8 @@ function generateJob(vip = false) {
     lockLugId,
     pay: basePay,
     baseRep: baseRepValue,
+    // Lock operating overhead to the same rig and territory used to quote this call.
+    operatingOverhead: getFleetOverheadFee({ veh }),
     timeLimit,
     vip,
     snipeCost: vip ? 4 : 0
@@ -1657,7 +1692,7 @@ function renderJobs() {
       ? (heavy ? state.hdTires > 0 : state.stdTires > 0)
       : state.plugs > 0;
     const overhead = getFleetOverheadFee(j);
-    const projected = Math.max(15, j.pay * (state.surgeJobs > 0 ? 2 : 1) - overhead);
+    const projected = Math.max(0, j.pay * (state.surgeJobs > 0 ? 2 : 1) - overhead);
     const risk = (j.isRusted ? 2 : 0) + (j.hasWheelLock ? 1 : 0) + (w.id === 'rain' || w.id === 'night' ? 1 : 0) + (heavy ? 1 : 0) + (j.vip ? 2 : 0);
     const riskLabel = risk >= 5 ? 'HIGH RISK' : risk >= 3 ? 'MODERATE' : 'ROUTINE';
     const riskColor = risk >= 5 ? '#fb7185' : risk >= 3 ? '#fbbf24' : '#34d399';
@@ -2543,7 +2578,7 @@ function completeJob() {
   const speedBonus = isFast ? Math.round(job.pay * 0.08) : 0;
   const overheadFee = getFleetOverheadFee(job);
   const totalDeductions = job.penalties + overheadFee;
-  const net = Math.max(15, gross + speedBonus - totalDeductions);
+  const net = Math.max(0, gross + speedBonus - totalDeductions);
   const z = getZone();
   const fallbackBaseRep = Math.round(((job.dmg && job.dmg.action === 'swap' ? 32 : 24) + (job.veh && job.veh.heavy ? 12 : 0)) * z.mult);
   const rawJobRep = job.baseRep || fallbackBaseRep;
