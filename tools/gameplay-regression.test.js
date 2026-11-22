@@ -931,7 +931,7 @@ test('territory selection enforces live REP gates across all six hubs and locks 
   assert.equal(state.zoneId,selectedZone);
   assert.equal(saves,savesBeforeActiveCall);
   assert.ok(alerts.some(x=>/ACTIVE CALL IN PROGRESS/.test(x)));
-  assert.equal(pages,5); // four successful hub selections and active-call redirect
+  assert.equal(pages,6); // five successful hub selections and active-call redirect
   assert.equal(refreshes,4);
 });
 
