@@ -192,6 +192,34 @@ async function reconcile(user) {
     if (!currentUser || currentUser.uid !== user.uid) return;
     const local = localSnapshot();
     if (local?.invalid) return;
+    // A player may explicitly choose this account's cloud career in the conflict
+    // dialog. Honor that durable choice before the ordinary cross-account owner
+    // guard; game boot/migration can briefly rewrite local save metadata on reload.
+    let restoreMarker = null;
+    try { restoreMarker = JSON.parse(localStorage.getItem(RESTORE_MARKER_KEY) || "null"); } catch {}
+    if (snap.exists() && restoreMarker?.uid === user.uid) {
+      const restoreCloud = snap.data();
+      if (restoreCloud?.schemaVersion === SCHEMA_VERSION && restoreCloud.payload && typeof restoreCloud.payload === "object" && !Array.isArray(restoreCloud.payload)) {
+        if (local) {
+          localStorage.setItem(OWNER_KEY, user.uid);
+          syncReady = true;
+          if (JSON.stringify(local.payload) === JSON.stringify(restoreCloud.payload)) {
+            localStorage.removeItem(RESTORE_MARKER_KEY);
+            status("Cloud career restored and connected.");
+          } else {
+            status("Finishing cloud career restore…");
+            queueSave(local.payload);
+          }
+        } else {
+          localStorage.setItem(LOCAL_KEY, JSON.stringify(restoreCloud.payload));
+          localStorage.setItem(OWNER_KEY, user.uid);
+          localStorage.removeItem(RESTORE_MARKER_KEY);
+          status("Cloud career restored to this device.");
+          location.reload();
+        }
+        return;
+      }
+    }
     if (local?.ownerUid && local.ownerUid !== user.uid) {
       if (snap.exists()) {
         const cloudData = snap.data();
@@ -228,32 +256,7 @@ async function reconcile(user) {
       status("The cloud save format is not recognized. Nothing was overwritten; ask for help before proceeding.", true);
       return;
     }
-    // A deliberate cloud restore must survive the reload needed for game.js to
-    // hydrate its in-memory state. The game may normalize the local payload during
-    // boot, so do not immediately reopen the same conflict on that first check.
-    let restoreMarker = null;
-    try { restoreMarker = JSON.parse(localStorage.getItem(RESTORE_MARKER_KEY) || "null"); } catch {}
     const cloudRevision = cloud.updatedAt?.toMillis ? cloud.updatedAt.toMillis() : null;
-    // The marker records an explicit player choice to use this account's cloud
-    // career. Its UID + local owner are the authority; payloads, timestamps, and
-    // device IDs can legitimately differ after game boot normalization or legacy
-    // Firestore reads. Do not reopen the same conflict while that choice is pending.
-    const markerStillOwnsCloud = restoreMarker?.uid === user.uid
-      && local?.ownerUid === user.uid;
-    if (markerStillOwnsCloud) {
-      syncReady = true;
-      if (JSON.stringify(local.payload) === JSON.stringify(cloud.payload)) {
-        localStorage.removeItem(RESTORE_MARKER_KEY);
-        status("Cloud career restored and connected.");
-      } else {
-        // Keep the explicit restore decision until the boot-normalized local
-        // career has been written back. This prevents a later reopen from
-        // treating the same restored career as a fresh conflict.
-        status("Finishing cloud career restore…");
-        queueSave(local.payload);
-      }
-      return;
-    }
     if (!local) {
       localStorage.setItem(LOCAL_KEY, JSON.stringify(cloud.payload));
       localStorage.setItem(OWNER_KEY, user.uid);
