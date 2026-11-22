@@ -437,6 +437,97 @@ test('legacy local save migration clamps and backfills fields without duplicatin
   assert.equal(state.lastSurgeRechargeAt, 123456);
 });
 
+test('local save survives a fresh-state reload with career, active repair, inventory, and tool progress intact', () => {
+  const store = new Map();
+  const localStorage = {
+    getItem: key => store.has(key) ? store.get(key) : null,
+    setItem: (key, value) => store.set(key, String(value))
+  };
+  const original = {
+    cash: 18450, rep: 9200, jobsCompleted: 63, gears: 4, tokens: 125,
+    zoneId: 'z5', unlockedRigTier: 3, contractsCompleted: 11,
+    claimedCareerGearMilestones: [10, 30, 60],
+    tools: {
+      impact: { level: 9 }, jack: { level: 9 },
+      comp: { level: 9 }, radar: { level: 9 }
+    },
+    stdTires: 7, hdTires: 2, plugs: 5, parts: 3,
+    activeJob: { step: 4, veh: { id: 'car-1' }, dmg: { action: 'replace' }, torqueDone: [1, 3] },
+    jobs: [{ id: 'job-1', veh: { id: 'car-2' }, dmg: { action: 'plug' } }],
+    ratings: [5, 4.8], customerLedger: { customerA: 2 },
+    rigCondition: 82, contract: { type: 'fast', progress: 2, target: 4, rewardZoneMult: 1.2, rewardContractRank: 12, rewardBonusRate: 0.25 },
+    bizName: 'DelWin Road Service', avatarEmoji: '🛞',
+    dispatchScans: 2, lastScanRechargeAt: 123456, surgeCharges: 1, lastSurgeRechargeAt: 123999,
+    firstDispatchBriefingSeen: true
+  };
+  const save = gameFunction('saveState', {
+    state: original, localStorage, window: { DelWinCloud: { queueSave: () => {} } }
+  });
+  save();
+
+  const restored = {
+    tools: {
+      impact: { level: 1 }, jack: { level: 1 },
+      comp: { level: 1 }, radar: { level: 1 }
+    },
+    jobs: [], activeJob: null, ratings: [], customerLedger: {},
+    claimedCareerGearMilestones: []
+  };
+  const load = gameFunction('loadState', {
+    state: restored, localStorage,
+    ZONES: [{ id: 'z1', mult: 1 }, { id: 'z5', mult: 1.2 }],
+    rollNewContract: () => { throw new Error('Existing contract should not be replaced'); },
+    canDispatchHeavyJobs: () => true,
+    getZone: () => ({ mult: 1.2 }),
+    MAX_DISPATCH_SCANS: 3, MAX_SURGE_CHARGES: 3,
+    Date: { now: () => 999999 }
+  });
+  load();
+  assert.equal(restored.cash, original.cash);
+  assert.equal(restored.rep, original.rep);
+  assert.equal(restored.gears, original.gears);
+  assert.equal(restored.tokens, original.tokens);
+  assert.equal(restored.zoneId, 'z5');
+  assert.equal(restored.unlockedRigTier, 3);
+  assert.deepEqual(restored.tools, original.tools);
+  assert.equal(restored.stdTires, 7);
+  assert.equal(restored.hdTires, 2);
+  assert.equal(restored.plugs, 5);
+  assert.equal(restored.parts, 3);
+  assert.deepEqual(restored.activeJob, original.activeJob);
+  assert.deepEqual(restored.jobs, original.jobs);
+  assert.deepEqual(restored.claimedCareerGearMilestones, [10, 30, 60]);
+  assert.deepEqual(restored.contract, original.contract);
+  assert.deepEqual(restored.customerLedger, original.customerLedger);
+  assert.equal(restored.rigCondition, 82);
+  assert.equal(restored.dispatchScans, 2);
+  assert.equal(restored.surgeCharges, 1);
+});
+
+test('corrupt local JSON does not crash loading or overwrite the unreadable stored bytes', () => {
+  const corrupt = '{broken-json';
+  let writes = 0;
+  const state = {
+    cash: 900, jobs: [{ veh: {}, dmg: {} }], activeJob: { veh: {}, dmg: {} },
+    tools: { impact: { level: 1 }, jack: { level: 1 }, comp: { level: 1 }, radar: { level: 1 } }
+  };
+  const localStorage = {
+    getItem: key => { assert.equal(key, 'delwin_v4_save'); return corrupt; },
+    setItem: () => { writes += 1; }
+  };
+  const load = gameFunction('loadState', {
+    state, localStorage, ZONES: [{ id: 'z1', mult: 1 }],
+    rollNewContract: () => {}, canDispatchHeavyJobs: () => false,
+    getZone: () => ({ mult: 1 }), MAX_DISPATCH_SCANS: 3, MAX_SURGE_CHARGES: 3,
+    Date: { now: () => 123456 }
+  });
+  assert.doesNotThrow(load);
+  assert.equal(state.cash, 900);
+  assert.deepEqual(state.jobs, []);
+  assert.equal(state.activeJob, null);
+  assert.equal(writes, 0);
+});
+
 test('local save writes the current state and queues the same state for cloud sync', () => {
   const state = { cash: 123, jobsCompleted: 4 };
   let localValue = '';
