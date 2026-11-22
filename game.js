@@ -1453,10 +1453,13 @@ function getTutorialCoaching(job) {
 
 function addBayPenalty(job, cashAmt, reason, repAmt = null) {
   if (!job || job.isTutorial) return;
+  if (!job.penaltyLog) job.penaltyLog = [];
+  // A repeated tap must not charge the same violation multiple times in one call.
+  // Different safety/protocol violations remain independently penalized.
+  if (job.penaltyLog.some(entry => entry.reason === reason)) return;
   const repLoss = repAmt !== null ? repAmt : Math.max(4, Math.round(cashAmt * 0.4));
   job.penalties += cashAmt;
   job.repPenalties = (job.repPenalties || 0) + repLoss;
-  if (!job.penaltyLog) job.penaltyLog = [];
   job.penaltyLog.push({ reason, amount: cashAmt, repLoss });
 }
 
@@ -2310,12 +2313,12 @@ function purchaseRigTier(tierNum) {
 
 function serviceActiveRig() {
   const condition = Math.max(0, Math.min(100, Number(state.rigCondition) || 100));
-  const missing = Math.ceil(100 - condition);
-  if (missing <= 0) {
+  if (condition >= 100) {
     showAlert('FLEET READY', 'Your active rig is already at full condition.');
     return;
   }
-  const cost = missing * 4;
+  // Keep the actual charge identical to the garage quote, including fractional wear.
+  const cost = Math.ceil((100 - condition) * 4);
   if (state.cash < cost) {
     showAlert('SERVICE FUNDING REQUIRED', `This maintenance visit costs ${cost.toLocaleString()}. Complete more calls to build your service reserve.`);
     return;
