@@ -80,6 +80,20 @@ test('cloud writes and conflict choices remain bound to the originating account'
   assert.match(cloudSource, /pendingConflict = null;[\s\S]*?busy = false;/);
 });
 
+test('local career owned by another account is never reconciled into the signed-in account', () => {
+  const ownerGuard = cloudSource.indexOf('if (local?.ownerUid && local.ownerUid !== user.uid)');
+  const cloudBranch = cloudSource.indexOf('if (snap.exists())', ownerGuard);
+  const noCloudBranch = cloudSource.indexOf('Nothing was uploaded', ownerGuard);
+  const returnIndex = cloudSource.indexOf('return;', noCloudBranch);
+  const normalReconcile = cloudSource.indexOf('if (!snap.exists())', ownerGuard);
+  assert.ok(ownerGuard >= 0 && cloudBranch > ownerGuard && noCloudBranch > cloudBranch);
+  assert.ok(returnIndex > noCloudBranch && normalReconcile > returnIndex,
+    'Ownership mismatch must stop before normal cloud restore/upload reconciliation');
+  assert.match(cloudSource, /showConflict\(local\.raw, cloudData, local\.ownerUid\)/);
+  assert.match(cloudSource, /pending\.localOwnerUid && pending\.localOwnerUid !== pending\.uid/);
+  assert.match(cloudSource, /cannot be uploaded to this account/);
+});
+
 test('local career ownership prevents silent upload to a different signed-in account', () => {
   assert.match(cloudSource, /const OWNER_KEY = "delwin_cloud_owner_uid"/);
   assert.match(cloudSource, /ownerUid: localStorage\.getItem\(OWNER_KEY\)/);
