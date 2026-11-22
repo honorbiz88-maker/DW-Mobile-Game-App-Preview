@@ -234,10 +234,13 @@ async function reconcile(user) {
     let restoreMarker = null;
     try { restoreMarker = JSON.parse(localStorage.getItem(RESTORE_MARKER_KEY) || "null"); } catch {}
     const cloudRevision = cloud.updatedAt?.toMillis ? cloud.updatedAt.toMillis() : null;
+    const markerPayloadMatchesCloud = !!restoreMarker?.cloudPayload
+      && JSON.stringify(restoreMarker.cloudPayload) === JSON.stringify(cloud.payload);
     const markerStillOwnsCloud = restoreMarker?.uid === user.uid
       && local?.ownerUid === user.uid
-      && cloudRevision !== null
-      && (restoreMarker.revision === cloudRevision || (restoreMarker.deviceId && cloud.deviceId === restoreMarker.deviceId));
+      && (markerPayloadMatchesCloud
+        || (cloudRevision !== null && restoreMarker.revision === cloudRevision)
+        || (restoreMarker.deviceId && cloud.deviceId === restoreMarker.deviceId));
     if (markerStillOwnsCloud) {
       syncReady = true;
       if (JSON.stringify(local.payload) === JSON.stringify(cloud.payload)) {
@@ -301,9 +304,14 @@ function keepCloud() {
   try {
     backupLocal(pending.localRaw);
     const cloudRevision = pending.cloudData.updatedAt?.toMillis ? pending.cloudData.updatedAt.toMillis() : null;
-    if (cloudRevision !== null) {
-      localStorage.setItem(RESTORE_MARKER_KEY, JSON.stringify({ uid: currentUser.uid, revision: cloudRevision, deviceId: getDeviceId() }));
-    }
+    // The restore decision is bound to the exact cloud payload, so it survives
+    // reloads even when a legacy/migrated Firestore document has no Timestamp.
+    localStorage.setItem(RESTORE_MARKER_KEY, JSON.stringify({
+      uid: currentUser.uid,
+      revision: cloudRevision,
+      deviceId: getDeviceId(),
+      cloudPayload: pending.cloudData.payload
+    }));
     localStorage.setItem(LOCAL_KEY, JSON.stringify(pending.cloudData.payload));
     localStorage.setItem(OWNER_KEY, currentUser.uid);
     window.DelWinCloud.pendingConflict = null;
