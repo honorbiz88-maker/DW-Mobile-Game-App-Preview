@@ -894,3 +894,78 @@ test('heavy-duty emergency drone drop costs five tokens and supplies only a heav
   assert.equal(state.hdTires,1);
   assert.equal(state.stdTires,0);
 });
+
+
+test('territory selection enforces REP unlocks and refuses switching during an active call', () => {
+  const zones=[
+    {id:'z1',unlockRep:0},{id:'z2',unlockRep:500},{id:'z3',unlockRep:1200}
+  ];
+  const state={rep:499,zoneId:'z1',activeJob:null};
+  const alerts=[];
+  let saves=0,refreshes=0,pages=0;
+  const select=gameFunction('selectZone',{
+    state,ZONES:zones,
+    showAlert:(title)=>alerts.push(title),goPage:()=>{pages++;},
+    SoundFX:{torqueClick:()=>{}},saveState:()=>{saves++;},updateHUD:()=>{},
+    refreshJobs:()=>{refreshes++;}
+  });
+  select('z2');
+  assert.equal(state.zoneId,'z1');
+  assert.equal(saves,0);
+  state.rep=500;
+  select('z2');
+  assert.equal(state.zoneId,'z2');
+  assert.equal(saves,1);
+  assert.equal(refreshes,1);
+  state.activeJob={step:2};
+  select('z3');
+  assert.equal(state.zoneId,'z2');
+  assert.equal(saves,1);
+  assert.ok(alerts.some(x=>/ACTIVE CALL IN PROGRESS/.test(x)));
+  assert.equal(pages,1);
+});
+
+test('heavy dispatch and heavy contracts remain locked until both Hub 2 and Tier 2 rig are active', () => {
+  const state={zoneId:'z1',unlockedRigTier:1,contract:{id:'c_fast'}};
+  const canDispatch=gameFunction('canDispatchHeavyJobs',{
+    state,getZone:()=>({hubNum:state.zoneId==='z1'?1:2}),getRigTier:()=>state.unlockedRigTier
+  });
+  assert.equal(canDispatch(),false);
+  state.zoneId='z5';
+  assert.equal(canDispatch(),false);
+  state.unlockedRigTier=2;
+  assert.equal(canDispatch(),true);
+
+  const availability=gameFunction('isContractAvailable',{
+    canDispatchHeavyJobs:()=>canDispatch()
+  });
+  assert.equal(availability({type:'heavy'}),true);
+  state.unlockedRigTier=1;
+  assert.equal(availability({type:'heavy'}),false);
+  assert.equal(availability({type:'plugs'}),true);
+});
+
+test('new contract rolls exclude the previous contract and unavailable heavy objectives', () => {
+  const state={
+    contract:{id:'c_fast'},contractsCompleted:5,zoneId:'z1'
+  };
+  const pool=[
+    {id:'c_fast',type:'fast',rewardPart:0},
+    {id:'c_heavy',type:'heavy',rewardPart:0},
+    {id:'c_plugs',type:'plugs',rewardPart:0}
+  ];
+  let randomCalls=0;
+  const roll=gameFunction('rollNewContract',{
+    state,CONTRACT_POOL:pool,
+    isContractAvailable:c=>c.type!=='heavy',
+    getZone:()=>({mult:1.25}),
+    Math:{random:()=>{randomCalls++;return 0;}}
+  });
+  roll();
+  assert.equal(state.contract.id,'c_plugs');
+  assert.equal(state.contract.progress,0);
+  assert.equal(state.contract.rewardZoneMult,1.25);
+  assert.equal(state.contract.rewardContractRank,6);
+  assert.equal(state.contract.rewardBonusRate,0.25);
+  assert.equal(randomCalls,1);
+});
