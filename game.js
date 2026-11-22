@@ -1001,6 +1001,24 @@ function renderTireSVG(job, size = 130) {
 }
 
 // --- INVENTORY & RIG CARGO CAPACITY BAR ---
+function renderDispatchRecoveryAdvisor() {
+  const page = document.getElementById('page-dispatch');
+  const jobs = (state.jobs || []).filter((job) => job && !job.vip && job.dmg && job.veh);
+  if (!page) return;
+  let panel = document.getElementById('dispatch-recovery-advisor');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'dispatch-recovery-advisor';
+    panel.style.cssText = 'margin:0 0 9px;padding:10px;border:1px solid var(--border);border-radius:9px;background:var(--panel);font-size:12px;';
+    page.insertBefore(panel, document.getElementById('job-list'));
+  }
+  if (state.activeJob || !jobs.length) { panel.style.display = 'none'; return; }
+  const stockReady = jobs.some((job) => job.dmg.action === 'plug' ? state.plugs > 0 : job.veh.heavy ? state.hdTires > 0 : state.stdTires > 0);
+  if (stockReady) { panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+  panel.textContent = 'DISPATCH RECOVERY: All regular calls currently require supplies that are not in your cargo. Review the stock cards above for the lowest-cost restock and cash shortfall.';
+}
+
 function renderStockBar() {
   const dispatchPage = document.getElementById('page-dispatch');
   if (!dispatchPage) return;
@@ -1226,6 +1244,7 @@ function updateHUD() {
   }
   renderContractBanner();
   renderStockBar();
+  renderDispatchRecoveryAdvisor();
   renderRatingPerkBanner();
   renderDispatchScanControl();
   renderProfileCard();
