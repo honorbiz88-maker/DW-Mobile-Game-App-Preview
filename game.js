@@ -2625,32 +2625,8 @@ function watchRewardedAd() {
   showAlert('NOT AVAILABLE IN PREVIEW', 'Rewarded ads are not connected in this build. No simulated rewards will be granted.');
 }
 
-function buyPack(packKey) {
-  const packs = {
-    starter: { label: 'Starter Roadside Kit ($1.99)', tokens: 25, gears: 1, cash: 500 },
-    pro: { label: 'Pro Fleet Bundle ($4.99)', tokens: 70, gears: 3, cash: 1800 },
-    yard: { label: 'Commercial Yard Crate ($9.99)', tokens: 160, gears: 8, cash: 5000 },
-    apex: { label: 'Apex Syndicate Vault ($19.99)', tokens: 380, gears: 20, cash: 15000 }
-  };
-  const p = packs[packKey];
-  if (!p) return;
-  state.tokens += p.tokens;
-  state.parts += p.gears;
-  state.cash += p.cash;
-  SoundFX.success();
-  saveState();
-  updateHUD();
-  if (document.getElementById('page-shop').classList.contains('active')) renderShop();
-  openModal(`
-    <span class="badge">DISPATCH CREDIT APPLIED</span>
-    <h3>${p.label}</h3>
-    <div style="background:#090c12;padding:12px;border-radius:10px;font-size:13px;display:flex;flex-direction:column;gap:6px;">
-      <div style="display:flex;justify-content:space-between;"><span>Dispatch Tokens:</span><strong style="color:#38bdf8;">+${p.tokens} ⚡</strong></div>
-      <div style="display:flex;justify-content:space-between;"><span>Gold Gears:</span><strong style="color:var(--amber);">+${p.gears} ⚙️</strong></div>
-      <div style="display:flex;justify-content:space-between;"><span>Fleet Cash:</span><strong style="color:var(--green);">+$${p.cash.toLocaleString()}</strong></div>
-    </div>
-    <button type="button" class="primary-btn" onclick="closeModal()">CONTINUE</button>
-  `);
+function buyPack() {
+  showAlert('PURCHASES NOT AVAILABLE', 'Real-money purchases are not connected in this Preview build. No currency has been added.');
 }
 
 function openModal(html) {
