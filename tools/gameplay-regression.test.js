@@ -524,7 +524,7 @@ test('torque stage enforces star order and only advances after all five lugs', (
   const job={step:5,torqueIdx:0,weather:{id:'clear'},floodlightsOn:true,penalties:0,repPenalties:0,penaltyLog:[]};
   const state={activeJob:job};
   const alerts=[];
-  const tap=gameFunction('tapLug',{state,WEATHER_CONDITIONS:[{id:'clear'}],STAR_ORDER:[1,3,5,2,4],addBayPenalty:(j,c,r,p)=>{if(!j.penaltyLog.some(x=>x.reason===r)){j.penalties+=c;j.repPenalties+=p;j.penaltyLog.push({reason:r});}},showAlert:(t)=>alerts.push(t),showBayActionHint:()=>{},renderBay:()=>{},SoundFX:{error:()=>{},impact:()=>{},torqueClick:()=>{}},triggerLugSpin:()=>{},Math:{random:()=>1}});
+  const tap=gameFunction('tapLug',{state,WEATHER_CONDITIONS:[{id:'clear'}],STAR_ORDER:[1,3,5,2,4],addBayPenalty:(j,c,r,p)=>{if(!j.penaltyLog.some(x=>x.reason===r)){j.penalties+=c;j.repPenalties+=p;j.penaltyLog.push({reason:r});}},showAlert:(t)=>alerts.push(t),showBayActionHint:()=>{},renderBay:()=>{},dismissAlert:()=>{},SoundFX:{error:()=>{},impact:()=>{},torqueClick:()=>{}},triggerLugSpin:()=>{},Math:{random:()=>1,floor:Math.floor,max:Math.max}});
   tap(3);
   assert.equal(job.torqueIdx,0);
   assert.equal(job.penalties,12);
