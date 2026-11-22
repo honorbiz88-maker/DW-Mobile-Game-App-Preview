@@ -13,7 +13,7 @@ const CONTRACTS = [
   { type: 'fast', target: 3 },
   { type: 'heavy', target: 2 }
 ];
-const HUB_GEAR_COST = [0, 5, 10, 15, 20, 25];
+const HUB_GEAR_COST = [0, 0, 5, 10, 15, 20, 25];
 
 function mulberry32(seed) {
   return function random() {
