@@ -55,11 +55,11 @@ const HUB_TIERS = [
 
 const RIG_TIERS = [
   { tier: 1, name: 'Tier 1: Novice Roadside Van', img: 'assets/rig-t1.png', color: '#cbd5e1', reqLvl: 1, req: 'Starting Rig', cashCost: 0, partCost: 0, tokenCost: 0, mult: 1.00, capPlugs: 6, capStd: 3, capHd: 1, perk: 'Standard highway response rig (1.00x Payouts).' },
-  { tier: 2, name: 'Tier 2: Intermediate Utility Pickup', img: 'assets/rig-t2.png', color: '#38bdf8', reqLvl: 5, req: 'All Tools Lvl 5+', cashCost: 2200, partCost: 2, tokenCost: 12, mult: 1.12, capPlugs: 9, capStd: 4, capHd: 2, perk: '1.12x Base Payouts & Twin Amber Strobes.' },
-  { tier: 3, name: 'Tier 3: Pro Extended Tire Truck', img: 'assets/rig-t3.png', color: '#f59e0b', reqLvl: 9, req: 'All Tools Lvl 9+', cashCost: 9500, partCost: 4, tokenCost: 25, mult: 1.25, capPlugs: 12, capStd: 6, capHd: 3, perk: '1.25x Base Payouts & Exterior Spare Tire Rack.' },
-  { tier: 4, name: 'Tier 4: Commercial Dually Rig', img: 'assets/rig-t4.png', color: '#a855f7', reqLvl: 13, req: 'All Tools Lvl 13+', cashCost: 36000, partCost: 8, tokenCost: 45, mult: 1.40, capPlugs: 16, capStd: 8, capHd: 4, perk: '1.40x Base Payouts & Dual-Wheel Hydraulic Lift.' },
-  { tier: 5, name: 'Tier 5: Heavy-Duty Fleet Rescue Box', img: 'assets/rig-t5.png', color: '#ef4444', reqLvl: 17, req: 'All Tools Lvl 17+', cashCost: 135000, partCost: 14, tokenCost: 75, mult: 1.56, capPlugs: 22, capStd: 10, capHd: 6, perk: '1.56x Base Payouts & Commercial Fleet Priority.' },
-  { tier: 6, name: 'Tier 6: Master Apex Syndicate Flagship', img: 'assets/rig-t6.png', color: '#fde047', reqLvl: 21, req: 'All Tools Lvl 21+', cashCost: 450000, partCost: 22, tokenCost: 110, mult: 1.74, capPlugs: 30, capStd: 14, capHd: 8, perk: '1.74x Base Payouts & Maximum Corridor Prestige.' }
+  { tier: 2, name: 'Tier 2: Intermediate Utility Pickup', img: 'assets/rig-t2.png', color: '#38bdf8', reqLvl: 5, req: 'All Tools Lvl 5+', cashCost: 2200, partCost: 2, tokenCost: 0, mult: 1.12, capPlugs: 9, capStd: 4, capHd: 2, perk: '1.12x Base Payouts & Twin Amber Strobes.' },
+  { tier: 3, name: 'Tier 3: Pro Extended Tire Truck', img: 'assets/rig-t3.png', color: '#f59e0b', reqLvl: 9, req: 'All Tools Lvl 9+', cashCost: 9500, partCost: 4, tokenCost: 0, mult: 1.25, capPlugs: 12, capStd: 6, capHd: 3, perk: '1.25x Base Payouts & Exterior Spare Tire Rack.' },
+  { tier: 4, name: 'Tier 4: Commercial Dually Rig', img: 'assets/rig-t4.png', color: '#a855f7', reqLvl: 13, req: 'All Tools Lvl 13+', cashCost: 36000, partCost: 8, tokenCost: 0, mult: 1.40, capPlugs: 16, capStd: 8, capHd: 4, perk: '1.40x Base Payouts & Dual-Wheel Hydraulic Lift.' },
+  { tier: 5, name: 'Tier 5: Heavy-Duty Fleet Rescue Box', img: 'assets/rig-t5.png', color: '#ef4444', reqLvl: 17, req: 'All Tools Lvl 17+', cashCost: 135000, partCost: 14, tokenCost: 0, mult: 1.56, capPlugs: 22, capStd: 10, capHd: 6, perk: '1.56x Base Payouts & Commercial Fleet Priority.' },
+  { tier: 6, name: 'Tier 6: Master Apex Syndicate Flagship', img: 'assets/rig-t6.png', color: '#fde047', reqLvl: 21, req: 'All Tools Lvl 21+', cashCost: 450000, partCost: 22, tokenCost: 0, mult: 1.74, capPlugs: 30, capStd: 14, capHd: 8, perk: '1.74x Base Payouts & Maximum Corridor Prestige.' }
 ];
 
 const ZONES = [
@@ -183,7 +183,6 @@ const TOKEN_DROP_RECHARGE_MS = 6 * 60 * 60 * 1000;
 const CLEAN_STREAK_GEAR_INTERVAL = 3;
 const STREAK_GEAR_MILESTONES = { 9: 2, 15: 3 };
 const MAX_STREAK_ROLLOVER = 15;
-const TOKEN_TO_GEAR_COST = 15;
 
 let state = {
   bizName: 'DelWin Mobile Tire Rescue',
@@ -2288,16 +2287,15 @@ function purchaseRigTier(tierNum) {
     showAlert('TOOL MILESTONE REQUIRED', `Upgrade all 4 tools to Level ${rig.reqLvl}+ before unlocking ${rig.name}.`);
     return;
   }
-  if (state.cash < rig.cashCost || state.parts < rig.partCost || state.tokens < rig.tokenCost) {
+  if (state.cash < rig.cashCost || state.parts < rig.partCost) {
     showAlert(
       'INSUFFICIENT RIG COMMISSION RESOURCES',
-      `${rig.name} requires $${rig.cashCost.toLocaleString()} Cash, ${rig.partCost} ⚙️ Gold Gears, and ${rig.tokenCost} ⚡ Dispatch Tokens.`
+      `${rig.name} requires ${rig.cashCost.toLocaleString()} Fleet Cash and ${rig.partCost} ⚙️ Gold Gears.`
     );
     return;
   }
   state.cash -= rig.cashCost;
   state.parts -= rig.partCost;
-  state.tokens -= rig.tokenCost;
   state.unlockedRigTier = tierNum;
   SoundFX.success();
   saveState();
@@ -2614,15 +2612,6 @@ function renderShop() {
       <p style="font-size:11px;color:var(--muted);">${tokCdTxt} · Recharges automatically.</p>
     </div>
 
-    <div class="item-card" style="border-color:var(--amber);">
-      <span class="badge">FOUNDRY EXCHANGE</span>
-      <h3>Convert Tokens into Gold Gears</h3>
-      <p style="font-size:12px;color:var(--muted);">Earn Gold Gears from clean-call streaks and contracts, or forge one for ${TOKEN_TO_GEAR_COST} Dispatch Tokens.</p>
-      <button type="button" class="primary-btn" ${state.tokens < TOKEN_TO_GEAR_COST ? 'disabled' : ''} onclick="exchangeTokensForGear()">
-        FORGE 1 GOLD GEAR · ${TOKEN_TO_GEAR_COST} TOKENS
-      </button>
-    </div>
-
     <div class="item-card">
       <span class="badge">FLEET RESTOCK</span>
       <h3>Buy supplies with earned cash</h3>
@@ -2632,72 +2621,8 @@ function renderShop() {
   `;
 }
 
-function exchangeTokensForGear() {
-  if (state.tokens < TOKEN_TO_GEAR_COST) {
-    showAlert('INSUFFICIENT TOKENS', `Forging 1 ⚙️ Gold Gear requires ${TOKEN_TO_GEAR_COST} ⚡ Dispatch Tokens.`);
-    return;
-  }
-  state.tokens -= TOKEN_TO_GEAR_COST;
-  state.parts += 1;
-  SoundFX.success();
-  saveState();
-  updateHUD();
-  renderShop();
-}
-
-function watchRewardedAd(type) {
-  syncSurgeRecharge();
-  syncTokenDropRecharge();
-
-  if (type === 'surge' && state.surgeCharges <= 0) {
-    showAlert('SURGE AD ON COOLDOWN', `Next 2X Surge ad charge available in ${formatMs(syncSurgeRecharge())}.`);
-    return;
-  }
-  if (type === 'tokens' && state.tokenDropCharges <= 0) {
-    showAlert('TOKEN AD ON COOLDOWN', `Next free ⚡ Token ad charge available in ${formatMs(syncTokenDropRecharge())}.`);
-    return;
-  }
-
-  openModal(`
-    <span class="badge">SPONSORED TRANSMISSION</span>
-    <h3>30s Roadside Partner Ad</h3>
-    <p style="font-size:13px;color:var(--muted);">Simulating rewarded sponsor video...</p>
-    <div id="ad-timer" style="font-size:28px;font-weight:900;color:var(--amber);text-align:center;">3</div>
-  `);
-  let sec = 3;
-  const iv = setInterval(() => {
-    sec--;
-    const el = document.getElementById('ad-timer');
-    if (el) el.textContent = sec;
-    if (sec <= 0) {
-      clearInterval(iv);
-      const rig = getActiveRigObj();
-      if (type === 'surge') {
-        if (state.surgeCharges === MAX_SURGE_CHARGES) state.lastSurgeRechargeAt = Date.now();
-        state.surgeCharges = Math.max(0, state.surgeCharges - 1);
-        state.surgeJobs += 1;
-      }
-      if (type === 'tokens') {
-        if (state.tokenDropCharges === MAX_TOKEN_DROPS) state.lastTokenDropRechargeAt = Date.now();
-        state.tokenDropCharges = Math.max(0, state.tokenDropCharges - 1);
-        state.tokens += 3;
-      }
-      if (type === 'restock') {
-        state.plugs = Math.min(rig.capPlugs, state.plugs + 4);
-        state.stdTires = Math.min(rig.capStd, state.stdTires + 2);
-        state.hdTires = Math.min(rig.capHd, state.hdTires + 1);
-      }
-      if (type === 'scan') {
-        refreshJobs();
-      }
-      SoundFX.success();
-      saveState();
-      updateHUD();
-      if (document.getElementById('page-shop').classList.contains('active')) renderShop();
-      closeModal();
-      if (type !== 'tokens' && type !== 'restock') goPage('dispatch');
-    }
-  }, 800);
+function watchRewardedAd() {
+  showAlert('NOT AVAILABLE IN PREVIEW', 'Rewarded ads are not connected in this build. No simulated rewards will be granted.');
 }
 
 function buyPack(packKey) {
