@@ -27,6 +27,7 @@ let syncReady = false;
 let syncTimer = null;
 let pendingPayload = null;
 let busy = false;
+let writing = false;
 
 function status(message, error = false) {
   const el = document.getElementById("cloud-account-status");
@@ -252,8 +253,43 @@ function keepCloud() {
 function pendingBelongsToUser(pending, user) {
   return !!pending && !!user && pending.uid === user.uid;
 }
+async function flushPendingSave(expectedUid) {
+  if (writing) return;
+  if (!pendingBelongsToUser(pendingPayload, currentUser) || currentUser.uid !== expectedUid || !syncReady) return;
+  if (busy) {
+    syncTimer = setTimeout(() => flushPendingSave(expectedUid), 1400);
+    return;
+  }
+  writing = true;
+  const next = pendingPayload.payload;
+  pendingPayload = null;
+  syncTimer = null;
+  let retryDelay = 1400;
+  try {
+    await writeCloud(next, expectedUid);
+    if (currentUser?.uid === expectedUid) status("Cloud save synced.");
+  } catch (error) {
+    if (currentUser?.uid === expectedUid && syncReady) {
+      // Keep the newest queued state; otherwise retry the failed snapshot.
+      if (!pendingBelongsToUser(pendingPayload, currentUser)) {
+        pendingPayload = { uid: expectedUid, payload: next };
+      }
+      retryDelay = 5000;
+      status(`Cloud sync delayed: ${error.message}. Your local career is safe; retrying automatically.`, true);
+    } else if (currentUser?.uid === expectedUid) {
+      status(`Cloud sync paused: ${error.message}. Your local career is safe.`, true);
+    }
+  } finally {
+    writing = false;
+    if (currentUser && syncReady && pendingBelongsToUser(pendingPayload, currentUser)) {
+      clearTimeout(syncTimer);
+      const nextUid = currentUser.uid;
+      syncTimer = setTimeout(() => flushPendingSave(nextUid), retryDelay);
+    }
+  }
+}
 function queueSave(payload) {
-  if (!currentUser || !syncReady || busy || !navigator.onLine) return;
+  if (!currentUser || !syncReady || !navigator.onLine) return;
   if (localStorage.getItem(OWNER_KEY) !== currentUser.uid) {
     status("Cloud sync paused: this device's career belongs to a different account.", true);
     return;
@@ -261,18 +297,7 @@ function queueSave(payload) {
   const queuedUid = currentUser.uid;
   pendingPayload = { uid: queuedUid, payload: JSON.parse(JSON.stringify(payload)) };
   clearTimeout(syncTimer);
-  syncTimer = setTimeout(async () => {
-    if (!pendingBelongsToUser(pendingPayload, currentUser) || currentUser.uid !== queuedUid || !syncReady) return;
-    const next = pendingPayload.payload;
-    pendingPayload = null;
-    syncTimer = null;
-    try {
-      await writeCloud(next, queuedUid);
-      status("Cloud save synced.");
-    } catch (error) {
-      status(`Cloud sync paused: ${error.message}. Your local career is safe.`, true);
-    }
-  }, 1400);
+  syncTimer = setTimeout(() => flushPendingSave(queuedUid), 1400);
 }
 window.DelWinCloud = { queueSave, keepLocal, keepCloud, signOut: () => signOut(auth), hasAccount: () => !!currentUser, pendingConflict: null };
 window.addEventListener("online", () => {
