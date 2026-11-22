@@ -2187,7 +2187,9 @@ function completeJob() {
     if (ct === 'heavy' && job.veh.heavy) state.contract.progress += 1;
   }
 
-  const jobRating = isCleanJob ? 5.0 : Math.max(2.0, 4.7 - job.penalties * 0.04);
+  // Ratings should reflect mistake severity without letting one small fee crater the whole career tier.
+  // $10 in penalties = 4.90; $30 = 4.70; severe cumulative penalties bottom out at 3.50.
+  const jobRating = isCleanJob ? 5.0 : Math.max(3.5, 5.0 - Math.min(1.5, job.penalties * 0.01));
   state.ratings.push(jobRating);
   if (state.ratings.length > 15) state.ratings.shift();
   state.activeJob = null;
