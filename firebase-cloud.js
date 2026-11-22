@@ -18,6 +18,7 @@ const firebaseConfig = {
 
 const LOCAL_KEY = "delwin_v4_save";
 const OWNER_KEY = "delwin_cloud_owner_uid";
+const RESTORE_MARKER_KEY = "delwin_cloud_restore_pending";
 const SCHEMA_VERSION = 1;
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -224,6 +225,18 @@ async function reconcile(user) {
       status("The cloud save format is not recognized. Nothing was overwritten; ask for help before proceeding.", true);
       return;
     }
+    // A deliberate cloud restore must survive the reload needed for game.js to
+    // hydrate its in-memory state. The game may normalize the local payload during
+    // boot, so do not immediately reopen the same conflict on that first check.
+    let restoreMarker = null;
+    try { restoreMarker = JSON.parse(localStorage.getItem(RESTORE_MARKER_KEY) || "null"); } catch {}
+    const cloudRevision = cloud.updatedAt?.toMillis ? cloud.updatedAt.toMillis() : null;
+    if (restoreMarker?.uid === user.uid && cloudRevision !== null && restoreMarker.revision === cloudRevision && local?.ownerUid === user.uid) {
+      localStorage.removeItem(RESTORE_MARKER_KEY);
+      syncReady = true;
+      status("Cloud career restored and connected.");
+      return;
+    }
     if (!local) {
       localStorage.setItem(LOCAL_KEY, JSON.stringify(cloud.payload));
       localStorage.setItem(OWNER_KEY, user.uid);
@@ -271,6 +284,10 @@ function keepCloud() {
   if (!pending || !currentUser || pending.uid !== currentUser.uid) return;
   try {
     backupLocal(pending.localRaw);
+    const cloudRevision = pending.cloudData.updatedAt?.toMillis ? pending.cloudData.updatedAt.toMillis() : null;
+    if (cloudRevision !== null) {
+      localStorage.setItem(RESTORE_MARKER_KEY, JSON.stringify({ uid: currentUser.uid, revision: cloudRevision }));
+    }
     localStorage.setItem(LOCAL_KEY, JSON.stringify(pending.cloudData.payload));
     localStorage.setItem(OWNER_KEY, currentUser.uid);
     window.DelWinCloud.pendingConflict = null;
