@@ -944,3 +944,22 @@ button, .lug-btn, .hud-pill-compact {
 .contract-career-rank span{font-size:9px;letter-spacing:.55px;font-weight:900;color:var(--muted)}
 .contract-career-rank strong{font-size:18px;color:var(--amber);font-variant-numeric:tabular-nums}
 .contract-career-rank em{font-size:9px;font-style:normal;color:#86efac;font-weight:800;text-align:right}
+
+
+/* Territory map: region progression and operating intelligence */
+.territory-hub-panel{padding:12px;margin:12px 0 8px;border-radius:13px;background:linear-gradient(135deg,rgba(10,26,43,.98),rgba(7,15,27,.96));border:1px solid rgba(96,165,250,.22)}
+.territory-hub-panel.is-active{border-color:rgba(245,158,11,.55);box-shadow:0 0 18px rgba(245,158,11,.08)}
+.territory-hub-head,.territory-hub-meta,.territory-zone-top,.territory-zone-details{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.territory-hub-head h3{font-size:14px;margin:5px 0 0}
+.territory-hub-head>strong{font-size:10px;color:var(--green);white-space:nowrap}
+.territory-hub-progress{height:6px;background:rgba(148,163,184,.17);border-radius:99px;overflow:hidden;margin:12px 0 7px}
+.territory-hub-progress span{display:block;height:100%;background:linear-gradient(90deg,#38bdf8,#fbbf24);border-radius:99px}
+.territory-hub-meta{font-size:9px;font-weight:850;color:var(--muted);flex-wrap:wrap}
+.territory-hub-meta strong{color:var(--amber)}
+.territory-zone-card{margin:8px 0}
+.territory-zone-top h3{font-size:14px;margin:5px 0}
+.territory-zone-status{font-size:9px;color:var(--muted);white-space:nowrap}
+.territory-zone-status.open{color:var(--green)}
+.territory-zone-card.active-territory{border-color:var(--amber);box-shadow:inset 0 0 0 1px rgba(245,158,11,.12)}
+.territory-zone-card p{font-size:11px;color:var(--muted);margin:5px 0 8px}
+.territory-zone-details{font-size:9px;color:var(--muted);font-weight:800;margin:7px 0 9px}
