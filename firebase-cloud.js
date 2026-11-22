@@ -200,22 +200,23 @@ async function reconcile(user) {
     if (snap.exists() && restoreMarker?.uid === user.uid) {
       const restoreCloud = snap.data();
       if (restoreCloud?.schemaVersion === SCHEMA_VERSION && restoreCloud.payload && typeof restoreCloud.payload === "object" && !Array.isArray(restoreCloud.payload)) {
-        if (local) {
-          localStorage.setItem(OWNER_KEY, user.uid);
-          syncReady = true;
-          if (JSON.stringify(local.payload) === JSON.stringify(restoreCloud.payload)) {
-            localStorage.removeItem(RESTORE_MARKER_KEY);
-            status("Cloud career restored and connected.");
-          } else {
-            status("Finishing cloud career restore…");
-            queueSave(local.payload);
-          }
-        } else {
-          localStorage.setItem(LOCAL_KEY, JSON.stringify(restoreCloud.payload));
-          localStorage.setItem(OWNER_KEY, user.uid);
+        const cloudPayload = JSON.stringify(restoreCloud.payload);
+        const localMatchesCloud = !!local && JSON.stringify(local.payload) === cloudPayload;
+        localStorage.setItem(OWNER_KEY, user.uid);
+        if (!localMatchesCloud) {
+          // The explicit Restore choice makes the cloud copy authoritative.
+          // Preserve any startup-normalized/device version as a backup, but
+          // never queue it over the selected cloud career.
+          if (local) backupLocal(local.raw, "restore-reconciliation");
+          localStorage.setItem(LOCAL_KEY, cloudPayload);
           localStorage.removeItem(RESTORE_MARKER_KEY);
-          status("Cloud career restored to this device.");
+          syncReady = false;
+          status("Cloud career restored. Your previous device career remains backed up.");
           location.reload();
+        } else {
+          localStorage.removeItem(RESTORE_MARKER_KEY);
+          syncReady = true;
+          status("Cloud career restored and connected.");
         }
         return;
       }
@@ -369,6 +370,12 @@ async function flushPendingSave(expectedUid) {
 }
 function queueSave(payload) {
   if (!currentUser || !syncReady || !navigator.onLine) return;
+  let restoreMarker = null;
+  try { restoreMarker = JSON.parse(localStorage.getItem(RESTORE_MARKER_KEY) || "null"); } catch {}
+  if (restoreMarker?.uid === currentUser.uid) {
+    status("Cloud restore is being finalized. The selected cloud career cannot be overwritten yet.");
+    return;
+  }
   if (localStorage.getItem(OWNER_KEY) !== currentUser.uid) {
     status("Cloud sync paused: this device's career belongs to a different account.", true);
     return;
