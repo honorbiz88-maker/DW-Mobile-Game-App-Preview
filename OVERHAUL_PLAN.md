@@ -213,6 +213,13 @@ Additional comparisons:
 - Add repeat business customers, fleet service contracts, certifications, and equipment specialization.
 - Build meaningful late-game dispatches, elite contracts, achievements, and endgame goals.
 
+### Save-integrity test status (2026-11-22)
+
+- [x] Add deterministic Firebase-module harness coverage for guest-only local saves, guest-to-account backup, first-device cloud restore, cross-account ownership conflict protection, local backup before cloud restore, and offline no-write behavior.
+- [x] Regression workflow passed: 70 tests, 70 passed, 0 failed (commit `c3227d5`).
+- [ ] Live Firebase Authentication + Firestore end-to-end testing remains outstanding. The harness mocks Firebase and browser APIs; it does not prove project configuration, real network behavior, real multi-device sync, or mobile-browser behavior.
+- [ ] Complete real account creation/sign-in, cross-device restore, offline/online recovery, and conflict-choice testing before marking save integrity complete.
+
 ### Stability and quality
 - Add automated regression tests for core economy formulas, reward grants, state migrations, and critical state transitions.
 - Test responsive layouts, touch interactions, timers, audio activation, and save recovery in real mobile browsers.
