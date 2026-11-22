@@ -90,7 +90,7 @@ function localSnapshot() {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? { raw, payload: parsed } : null;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? { raw, payload: parsed } : { raw, invalid: true };
   } catch {
     status("The local career save could not be read. It has not been changed; contact support before resetting browser data.", true);
     return { raw, invalid: true };
@@ -132,11 +132,13 @@ function showConflict(localRaw, cloudData) {
     <button class="secondary-btn" onclick="window.DelWinCloud.keepCloud()">RESTORE CLOUD CAREER</button>
     <p style="font-size:10px;color:var(--muted);">The copy you do not choose will be backed up on this device before anything is replaced.</p>
   `);
-  window.DelWinCloud.pendingConflict = { localRaw, cloudData };
+  window.DelWinCloud.pendingConflict = { localRaw, cloudData, uid: currentUser?.uid || null };
 }
-async function writeCloud(payload) {
-  if (!currentUser) throw new Error("Sign in before syncing.");
-  const ref = doc(db, "users", currentUser.uid, "saves", "current");
+async function writeCloud(payload, expectedUid = currentUser?.uid) {
+  if (!expectedUid || !currentUser || currentUser.uid !== expectedUid) {
+    throw new Error("Account changed before the save could sync. Your local career is safe.");
+  }
+  const ref = doc(db, "users", expectedUid, "saves", "current");
   await setDoc(ref, saveEnvelope(payload));
 }
 async function reconcile(user) {
@@ -153,7 +155,8 @@ async function reconcile(user) {
     if (local?.invalid) return;
     if (!snap.exists()) {
       if (local) {
-        await writeCloud(local.payload);
+        await writeCloud(local.payload, user.uid);
+        if (!currentUser || currentUser.uid !== user.uid) return;
         status("Your existing device career is backed up to your account.");
       } else {
         status("Account connected. Your career will sync after your first save.");
@@ -186,10 +189,10 @@ async function reconcile(user) {
 }
 async function keepLocal() {
   const pending = window.DelWinCloud.pendingConflict;
-  if (!pending || !currentUser) return;
+  if (!pending || !currentUser || pending.uid !== currentUser.uid) return;
   try {
     localStorage.setItem(`delwin_cloud_backup_${currentUser.uid}`, JSON.stringify(pending.cloudData));
-    await writeCloud(JSON.parse(pending.localRaw));
+    await writeCloud(JSON.parse(pending.localRaw), pending.uid);
     syncReady = true;
     window.DelWinCloud.pendingConflict = null;
     window.closeModal?.();
@@ -200,7 +203,7 @@ async function keepLocal() {
 }
 function keepCloud() {
   const pending = window.DelWinCloud.pendingConflict;
-  if (!pending) return;
+  if (!pending || !currentUser || pending.uid !== currentUser.uid) return;
   try {
     backupLocal(pending.localRaw);
     localStorage.setItem(LOCAL_KEY, JSON.stringify(pending.cloudData.payload));
@@ -226,7 +229,7 @@ function queueSave(payload) {
     pendingPayload = null;
     syncTimer = null;
     try {
-      await writeCloud(next);
+      await writeCloud(next, queuedUid);
       status("Cloud save synced.");
     } catch (error) {
       status(`Cloud sync paused: ${error.message}. Your local career is safe.`, true);
