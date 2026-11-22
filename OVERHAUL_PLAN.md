@@ -61,19 +61,21 @@ The game is intended to be **monetized at a later production stage**. Monetizati
 
 ### Source-verified upgrade cost baseline (Preview main)
 
-The current `game.js` formulas produce the following full-career upgrade requirement. These are exact purchase costs calculated from the current tool and rig constants, not estimated service earnings.
+The current `game.js` formula includes the established 20% discount on upgrades from Levels 1–4 and the 15% easing on upgrades from Level 13 onward. The late-game 1.14 tier factor remains in place. The following are exact costs calculated from those source formulas, not estimates of service earnings.
 
 | Hub | Tool upgrade cash | Rig commission cash | Total cash | Gold Gears |
 |---|---:|---:|---:|---:|
-| 1 · Atlanta Metro | $7,090 | $0 | $7,090 | 4 |
+| 1 · Atlanta Metro | $5,670 | $0 | $5,670 | 4 |
 | 2 · Georgia Freight | $21,610 | $1,800 | $23,410 | 9 |
 | 3 · Coastal Ports | $66,000 | $9,500 | $75,500 | 14 |
-| 4 · Southeast Express | $229,650 | $36,000 | $265,650 | 19 |
-| 5 · Gulf Corridor | $700,700 | $108,000 | $808,700 | 24 |
-| 6 · Apex Syndicate | $1,333,500 | $360,000 | $1,693,500 | 5 |
-| **Full progression** | **$2,358,550** | **$515,300** | **$2,873,850** | **75** |
+| 4 · Southeast Express | $195,350 | $36,000 | $231,350 | 19 |
+| 5 · Gulf Corridor | $595,800 | $108,000 | $703,800 | 24 |
+| 6 · Apex Syndicate | $1,133,000 | $360,000 | $1,493,000 | 5 |
+| **Full progression** | **$2,017,430** | **$515,300** | **$2,532,730** | **75** |
 
-Gold Gear demand is 60 for the five tool breakthroughs across four tools, plus 15 for the five rig commissions. The final hub has no additional tool breakthrough Gear cost because the last tool breakthrough is the Level 20 → 21 purchase in Hub 5.
+Gold Gear demand is 60 for the five tool breakthroughs across four tools, plus 15 for the five rig commissions. Hub 6 has no additional tool breakthrough Gear cost because the final tool breakthrough is Level 20 → 21 in Hub 5.
+
+The 20% early and 15% late discounts were present in the earlier Preview implementation. They were accidentally dropped when the duplicate initialization block was removed, because the copy containing those adjustments was deleted while the remaining function lacked them. The discounts have now been restored in the single active `getToolUpgradeSpec()` implementation.
 
 ### Source-verified reward streams
 
@@ -95,16 +97,17 @@ Career milestones add up to 15 more by call 275. Contract Gears are additional a
 
 ### Current conclusions
 
-- The previous roadmap's cash baseline was understated. The current full tool-plus-rig requirement is **$2,873,850**; use the table above for future planning.
-- Gear supply is plausibly sufficient for engaged players, but low-clean-rate players may rely more heavily on contract completion. Validate this with playtest telemetry before changing rewards or costs.
+- The verified full tool-plus-rig cash requirement is **$2,532,730** with the established discounts restored.
+- Clean-streak and career Gear rewards can supply the 75-Gear progression requirement for engaged players; contract rewards add further Gears. Low-clean-rate players need more contract participation. These are expected-value estimates, not observed player telemetry.
 - Rig maintenance now has a capped operating-overhead effect (0–20%) and service costs $1.50 per condition point restored. It is a modest operating incentive, not a hard failure gate.
 - Dispatch estimates subtract the estimated replacement cost of the consumed supply. The estimate excludes performance bonuses and penalties by design.
+- A provisional cash-flow simulation indicates that full max-level progression is a multi-thousand-call career. The estimate assumes 70% fast completions, 5-star rating, two free Surges used per day, one contract claimed about every 10 calls, strategic territory selection, and estimated contract/VIP value. It is sensitive to actual play frequency, contract cadence, Surge use, penalties, and inventory behavior; use it as a pacing warning, not a release promise.
 
 ### Remaining validation
 
-1. Build a cash-flow model using exact vehicle, weather, hazard, inventory-consumption, and zone distributions.
-2. Model contract completion rates and clean streaks across casual, regular, dedicated, and high-volume play patterns.
-3. Validate time-to-unlock for each tool tier, rig tier, and territory against intended career pacing.
+1. Run repeatable Monte Carlo simulations with actual dispatch and repair distributions, contract objective completion, Surge recharge, and inventory timing.
+2. Validate time-to-unlock for each tool tier, rig tier, and territory against intended career pacing.
+3. Test low/average/high performance and missed-contract scenarios; identify whether late-game cash costs create an excessive grind.
 4. Review edge cases in ratings, Surge, dispatch refresh, and save migration.
 5. Make only evidence-backed balance changes; preserve approved progression decisions unless measured results justify a change.
 
