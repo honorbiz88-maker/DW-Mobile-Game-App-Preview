@@ -128,6 +128,7 @@ function summarize(name, options, runs, maxCalls = 2600) {
   const gears = rows.map((row) => row.totalEarned);
   const contracts = rows.map((row) => row.contractsClaimed);
   const hubs = rows.map((row) => row.hub);
+  const firstHub2 = rows.map((row) => row.firstHub2Call || maxCalls + 1);
   const to75 = Array.from({ length: 2000 }, (_, index) =>
     simulate(90261122 + index, { ...options, maxCalls: 30000, stopAt75: true }).calls
   );
@@ -139,6 +140,9 @@ function summarize(name, options, runs, maxCalls = 2600) {
     p90Gears: Number(percentile(gears, 0.90).toFixed(1)),
     meanContracts: Number((contracts.reduce((a, b) => a + b, 0) / contracts.length).toFixed(1)),
     medianHub: percentile(hubs, 0.50),
+    medianFirstHub2Call: Math.round(percentile(firstHub2, 0.50)),
+    p10FirstHub2Call: Math.round(percentile(firstHub2, 0.10)),
+    p90FirstHub2Call: Math.round(percentile(firstHub2, 0.90)),
     medianCallsTo75: Math.round(percentile(to75, 0.50)),
     p10CallsTo75: Math.round(percentile(to75, 0.10)),
     p90CallsTo75: Math.round(percentile(to75, 0.90))
