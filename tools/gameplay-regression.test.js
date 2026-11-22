@@ -125,6 +125,21 @@ test('restoring a cloud conflict backs up the device career before replacing it'
   assert.match(restore, /pending\.uid !== currentUser\.uid/);
 });
 
+test('a deliberate cloud restore survives reload without reopening the same conflict', () => {
+  const restoreStart = cloudSource.indexOf('function keepCloud()');
+  const restoreEnd = cloudSource.indexOf('function pendingBelongsToUser', restoreStart);
+  const restore = cloudSource.slice(restoreStart, restoreEnd);
+  assert.match(restore, /RESTORE_MARKER_KEY/);
+  assert.match(restore, /revision: cloudRevision/);
+  const reconcileStart = cloudSource.indexOf('async function reconcile(user)');
+  const reconcileEnd = cloudSource.indexOf('async function keepLocal()', reconcileStart);
+  const reconcile = cloudSource.slice(reconcileStart, reconcileEnd);
+  assert.match(reconcile, /restoreMarker\?\.uid === user\.uid/);
+  assert.match(reconcile, /restoreMarker\.revision === cloudRevision/);
+  assert.ok(reconcile.indexOf('RESTORE_MARKER_KEY') < reconcile.indexOf('if (!local)'));
+  assert.match(reconcile, /Cloud career restored and connected/);
+});
+
 test('local career owned by another account is never reconciled into the signed-in account', () => {
   const ownerGuard = cloudSource.indexOf('if (local?.ownerUid && local.ownerUid !== user.uid)');
   const cloudBranch = cloudSource.indexOf('if (snap.exists())', ownerGuard);
