@@ -181,7 +181,7 @@ async function reconcile(user) {
   } catch (error) {
     status(`Cloud check failed: ${error.message}. Your local career remains available.`, true);
   } finally {
-    busy = false;
+    if (currentUser?.uid === user.uid) busy = false;
   }
 }
 async function keepLocal() {
@@ -297,6 +297,7 @@ onAuthStateChanged(auth, user => {
       clearTimeout(syncTimer);
       syncTimer = null;
       pendingPayload = null;
+      busy = false;
     }
     currentUser = user;
     syncReady = false;
