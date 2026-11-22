@@ -1094,6 +1094,19 @@ function updateHUD() {
   if (drawerParts) drawerParts.textContent = `${state.parts} ⚙️`;
   const avg = getRatingAvg().toFixed(1);
   const rInfo = getRatingTierInfo();
+  const callProfiles = veh.heavy
+    ? [
+        { type: 'FLEET CONTRACT', customer: 'Regional Logistics', location: 'Freight access road' },
+        { type: 'COMMERCIAL RESCUE', customer: 'Independent Haulage', location: 'Warehouse district' },
+        { type: 'ROADSIDE PRIORITY', customer: 'Fleet Operations', location: 'Highway service lane' }
+      ]
+    : [
+        { type: 'CUSTOMER ASSIST', customer: 'Private Motorist', location: 'Local connector road' },
+        { type: 'ROADSIDE RESCUE', customer: 'Verified Driver', location: 'Highway shoulder' },
+        { type: 'MOBILE SERVICE', customer: 'Walk-up Customer', location: 'Retail corridor' }
+      ];
+  const profile = callProfiles[Math.floor(Math.random() * callProfiles.length)];
+  const callCode = 'DW-' + Math.floor(1000 + Math.random() * 9000);
   const drawerRating = document.getElementById('drawer-rating');
   if (drawerRating) drawerRating.textContent = `${avg} ★ (${rInfo.bonusPct})`;
   const z = getZone();
@@ -1185,6 +1198,10 @@ function generateJob(vip = false) {
 
   return {
     id: 'job_' + Math.random().toString(36).slice(2, 8),
+    callType: vip ? 'PRIORITY CONTRACT' : profile.type,
+    customer: vip ? 'Commercial Dispatch Desk' : profile.customer,
+    locationLabel: profile.location,
+    callCode,
     title: `${z.name.split(' ')[0]} Mile ${mile} — Stranded ${veh.label.split(' ')[1]}`,
     veh,
     dmg,
@@ -1249,6 +1266,8 @@ function renderJobs() {
           <div class="job-pay">$ ${j.pay}${state.surgeJobs > 0 ? ' · 2X' : ''}</div>
         </div>
         <div class="dispatch-vehicle-art">${renderVehicleSVG(j.veh)}<span class="vehicle-class-tag">${heavy ? 'HEAVY-DUTY FLEET' : 'ROAD SERVICE'}</span></div>
+        <div class="dispatch-customer-line"><span>${j.customer || 'Roadside Customer'}</span><strong>${j.callCode || 'DW-0000'}</strong></div>
+        <div class="dispatch-location-line">📍 ${j.locationLabel || 'Service area'} · ${j.callType || 'ROAD SERVICE'}</div>
         <div class="dispatch-intel-strip">
           <span style="color:${riskColor};">● ${riskLabel}</span>
           <span>NET EST. <strong>$${projected}</strong></span>
