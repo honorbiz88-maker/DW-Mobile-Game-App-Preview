@@ -88,7 +88,7 @@ The previous reward structure was too generous. The source code was granting Gol
 - Existing player Gear balances are preserved. Previously earned Gears are not removed or reset; already-issued contracts in existing saves retain their promised reward, while newly issued contracts use the revised rewards.
 - Tool and rig Gear requirements remain unchanged at **75 total**. No new exchange, Gear purchase, or fake monetization flow has been added.
 
-The new typical-play supply estimate is roughly 15 career Gears + about 55–60 contract milestone Gears across a 2,600-call career (assuming roughly one completed contract every 7–8 calls) + a small number of 20-clean-call streak rewards. That puts ordinary progression near the 75-Gear requirement rather than the previous large surplus. This is a pacing target, not a guarantee: contract completion and clean streak rates vary by player.
+The updated Gear-only career simulation below replaces the rough 2,600-call estimate. In a typical-performance scenario (75% clean, 65% fast), the median player reaches the 75-Gear lifetime threshold at about 2,771 calls when completed contracts are claimed immediately. A five-call delay before claiming pushes the median to about 4,382 calls. This is a modeled Gear pacing result, not a guarantee or a full cash/REP progression simulation.
 
 ### Early Gear-access validation — 2026-11-22
 
@@ -104,13 +104,39 @@ This is a pacing calculation, not a deterministic guarantee. Players who delay c
 
 The streak reward has a strongly skill-dependent expected frequency. Under an idealized independent-call model, the expected wait for 20 consecutive clean calls is about 1,257 calls at a 75% clean rate and about 72 calls at a 90% clean rate. These are mathematical expectations, not measured player behavior; real clean-call outcomes may be correlated and vary with difficulty. This means the streak stream is rare for typical execution but can add a meaningful earned bonus for consistently excellent play.
 
+### Revised Gear-only career simulation — 2026-11-22
+
+A new 500-run Monte Carlo simulation was performed for each scenario using the revised reward schedule. It models the source-defined reward thresholds and contract pool:
+
+- Career awards: 1 / 2 / 2 / 3 / 3 / 4 Gears at calls 10 / 30 / 60 / 100 / 175 / 275.
+- Streak award: 1 Gear for each 20 consecutive clean calls, then streak rollover.
+- Contract award: 1 Gear for every sixth claimed contract; no direct Gear award on any contract type.
+- Contract pool: clean streak 4, plugs 3, swaps 3, fast 3, heavy 2. The next contract is randomly selected from the eligible pool excluding the just-completed type. Heavy contracts enter the pool only after Tier 2 is unlocked.
+- Damage mix: one plug outcome and four swap outcomes from the five source-defined damage entries (20% plug / 80% swap).
+- Heavy objective event: modeled at 32% per call after Tier 2 (2 heavy vehicle types out of 5, multiplied by the 80% swap mix); VIP-specific freight dispatches are not separately modeled.
+- The model tracks cumulative lifetime Gear earned against the cumulative unlock thresholds of 5 / 15 / 30 / 50 / 75 Gears for Tiers 2–6. It does not simulate spending cash, earning REP, upgrade time, finite stock, or whether a player can afford supplies.
+
+**Calls to earn the 75-Gear lifetime threshold** (median; 10th–90th percentile):
+
+| Performance assumption | Claim immediately | Wait 5 calls to claim |
+|---|---:|---:|
+| Strong: 90% clean / 85% fast | 1,599 (1,455–1,758) | 2,171 (1,950–2,399) |
+| Typical: 75% clean / 65% fast | 2,771 (2,604–2,933) | 4,383 (4,177–4,600) |
+| Rough: 55% clean / 40% fast | 4,061 (3,834–4,326) | 5,847 (5,579–6,145) |
+
+At 2,600 calls in the typical-performance scenario, the model averages about **71 Gears** with immediate claims, about **60** with a two-call claim delay, and about **50** with a five-call delay. The five-call delay also moves the average player below the Tier 5 Gear threshold at that horizon. These results show that leaving a completed contract unclaimed is a major progression drag because the next contract cannot be assigned.
+
+The first Tier 2 Gear threshold is reached around call 60 in typical and rough scenarios, and around call 51 in the strong scenario. This is consistent with the career milestones providing 5 Gears by call 60. It does not prove the player has enough cash or 1,800 REP to commission the rig at that point.
+
+**Interpretation:** the reduced Gear economy is now meaningfully tighter. Typical players approach full Gear progression around 2,800 calls with prompt contract claims; weaker execution or delayed claims extends the career substantially. Do not raise Gear rewards or change Gear costs from this model alone. The next product-side improvement should make a completed contract and its claim action unmistakable, then validate actual claim behavior in playtests.
+
 ### Current conclusions
 
 - The verified full tool-plus-rig cash requirement is **$2,532,730** with the established discounts restored.
 - The revised Gear schedule is designed to put a typical player near the 75-Gear requirement over a full career, with the contract cadence as the main variable. Re-run the full progression simulation against the new reward schedule before treating the earlier max-progression call counts as current.
 - Rig maintenance now has a capped operating-overhead effect (0–20%) and service costs $1.50 per condition point restored. It is a modest operating incentive, not a hard failure gate.
 - Dispatch estimates subtract the estimated replacement cost of the consumed supply. The estimate excludes performance bonuses and penalties by design.
-- A source-driven Monte Carlo audit was run against the earlier, more generous reward schedule. Its old Gear-balance outputs are historical and must not be used to describe the revised schedule. The current reduced Gear schedule has source-level and early-unlock checks documented here; a full updated Monte Carlo run including finite inventory and cash-starvation remains outstanding.
+- The previous source-driven Monte Carlo audit used the more generous reward schedule; its old Gear-balance outputs are historical and superseded. A new Gear-only career simulation now models the reduced reward streams, the actual five contract objectives, contract exclusion/rotation, the 20-call streak, the 10/30/60/100/175/275 career milestones, and claim delays. It still does not model cash, REP, inventory, or supply affordability.
 - The model assumes the player always chooses the highest unlocked territory, buys upgrades in a balanced order, accepts VIP calls when offered and affordable, and claims completed contracts after the modeled delay. It uses aggregate clean/fast probabilities and average penalty amounts rather than simulating every individual bay mistake.
 - Supply costs are modeled at long-run replacement cost per call. The model does **not** yet simulate finite stock inventory, cargo-capacity restocking, or a cash-starved player being unable to buy the next supply. Results are directional pacing estimates, not observed telemetry or a release promise.
 
