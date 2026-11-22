@@ -937,3 +937,10 @@ button, .lug-btn, .hud-pill-compact {
 
 /* Repeat-customer loyalty callout */
 .customer-loyalty-note{padding:8px 10px;margin:7px 0;border-radius:8px;background:rgba(245,158,11,.09);border:1px solid rgba(245,158,11,.24);color:#fcd34d;font-size:11px;font-weight:800}
+
+
+/* Contract career ladder */
+.contract-career-rank{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;margin:8px 0;background:rgba(5,12,22,.72);border:1px solid rgba(245,158,11,.2);border-radius:9px}
+.contract-career-rank span{font-size:9px;letter-spacing:.55px;font-weight:900;color:var(--muted)}
+.contract-career-rank strong{font-size:18px;color:var(--amber);font-variant-numeric:tabular-nums}
+.contract-career-rank em{font-size:9px;font-style:normal;color:#86efac;font-weight:800;text-align:right}
