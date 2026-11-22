@@ -1624,7 +1624,7 @@ function generateJob(vip = false) {
 
 function refreshJobs() {
   const rInfo = getRatingTierInfo();
-  const hasVipSlot = Math.random() < (rInfo.vipChance + 0.55);
+  const hasVipSlot = Math.random() < rInfo.vipChance;
   state.jobs = [
     generateJob(false),
     generateJob(false),
