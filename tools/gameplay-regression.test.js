@@ -1480,7 +1480,7 @@ function cloudModuleHarness({ local = {}, cloud = {}, user = null, online = true
     serverTimestamp: () => ({ seconds: 123456 }),
     localSnapshot: undefined
   };
-  const executable = cloudSource.replace(/^import[\\s\\S]*?;\\s*/gm, '');
+  const executable = cloudSource.slice(cloudSource.indexOf('const firebaseConfig'));
   vm.runInNewContext(executable, context, { timeout: 1000 });
   return { store, cloudDocs, elements, calls, timers, context, auth, trigger: async (id, type = 'click') => {
     const callback = calls.listeners[id + ':' + type];
