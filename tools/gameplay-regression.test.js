@@ -858,3 +858,39 @@ test('over-inflation repeat taps do not stack the same safety penalty', () => {
   assert.ok(stops>=2);
   assert.ok(alerts.length>=1);
 });
+
+
+test('tire swap consumes only the matching standard or heavy-duty inventory once', () => {
+  for (const scenario of [
+    { heavy:false, stdTires:1, hdTires:7, expectedStd:0, expectedHd:7 },
+    { heavy:true, stdTires:7, hdTires:1, expectedStd:7, expectedHd:0 }
+  ]) {
+    const job={step:3,scanned:true,fixed:false,dmg:{action:'swap',title:'Sidewall damage'},veh:{heavy:scenario.heavy}};
+    const state={activeJob:job,stdTires:scenario.stdTires,hdTires:scenario.hdTires};
+    const repair=gameFunction('performRepair',{
+      state,showBayActionHint:()=>{},showAlert:()=>{},addBayPenalty:()=>{},dismissAlert:()=>{},
+      SoundFX:{impact:()=>{}},updateHUD:()=>{},renderBay:()=>{},
+      document:{getElementById:()=>({classList:{add:()=>{},remove:()=>{}}})},setTimeout:()=>{}
+    });
+    repair('swap');
+    assert.equal(state.stdTires,scenario.expectedStd);
+    assert.equal(state.hdTires,scenario.expectedHd);
+    assert.equal(job.fixed,true);
+    assert.equal(job.step,4);
+    repair('swap');
+    assert.equal(state.stdTires,scenario.expectedStd);
+    assert.equal(state.hdTires,scenario.expectedHd);
+  }
+});
+
+test('heavy-duty emergency drone drop costs five tokens and supplies only a heavy tire', () => {
+  const job={step:3,scanned:true,fixed:false,veh:{heavy:true}};
+  const state={activeJob:job,tokens:6,stdTires:0,hdTires:0};
+  const drop=gameFunction('droneDrop',{
+    state,showAlert:()=>{},goPage:()=>{},SoundFX:{success:()=>{}},updateHUD:()=>{},renderBay:()=>{}
+  });
+  drop();
+  assert.equal(state.tokens,1);
+  assert.equal(state.hdTires,1);
+  assert.equal(state.stdTires,0);
+});
