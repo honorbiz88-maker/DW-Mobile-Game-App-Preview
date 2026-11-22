@@ -1094,19 +1094,6 @@ function updateHUD() {
   if (drawerParts) drawerParts.textContent = `${state.parts} ⚙️`;
   const avg = getRatingAvg().toFixed(1);
   const rInfo = getRatingTierInfo();
-  const callProfiles = veh.heavy
-    ? [
-        { type: 'FLEET CONTRACT', customer: 'Regional Logistics', location: 'Freight access road' },
-        { type: 'COMMERCIAL RESCUE', customer: 'Independent Haulage', location: 'Warehouse district' },
-        { type: 'ROADSIDE PRIORITY', customer: 'Fleet Operations', location: 'Highway service lane' }
-      ]
-    : [
-        { type: 'CUSTOMER ASSIST', customer: 'Private Motorist', location: 'Local connector road' },
-        { type: 'ROADSIDE RESCUE', customer: 'Verified Driver', location: 'Highway shoulder' },
-        { type: 'MOBILE SERVICE', customer: 'Walk-up Customer', location: 'Retail corridor' }
-      ];
-  const profile = callProfiles[Math.floor(Math.random() * callProfiles.length)];
-  const callCode = 'DW-' + Math.floor(1000 + Math.random() * 9000);
   const drawerRating = document.getElementById('drawer-rating');
   if (drawerRating) drawerRating.textContent = `${avg} ★ (${rInfo.bonusPct})`;
   const z = getZone();
@@ -1175,6 +1162,19 @@ function generateJob(vip = false) {
   const mile = Math.floor(Math.random() * 65) + 4;
   const rig = RIG_TIERS[getRigTier() - 1];
   const rInfo = getRatingTierInfo();
+  const callProfiles = veh.heavy
+    ? [
+        { type: 'FLEET CONTRACT', customer: 'Regional Logistics', location: 'Freight access road' },
+        { type: 'COMMERCIAL RESCUE', customer: 'Independent Haulage', location: 'Warehouse district' },
+        { type: 'ROADSIDE PRIORITY', customer: 'Fleet Operations', location: 'Highway service lane' }
+      ]
+    : [
+        { type: 'CUSTOMER ASSIST', customer: 'Private Motorist', location: 'Local connector road' },
+        { type: 'ROADSIDE RESCUE', customer: 'Verified Driver', location: 'Highway shoulder' },
+        { type: 'MOBILE SERVICE', customer: 'Walk-up Customer', location: 'Retail corridor' }
+      ];
+  const profile = callProfiles[Math.floor(Math.random() * callProfiles.length)];
+  const callCode = 'DW-' + Math.floor(1000 + Math.random() * 9000);
 
   const isRusted = Math.random() < (z.rustChance + (vip ? 0.15 : 0));
   const rustLayers = isRusted ? (z.mult >= 2.0 ? 3 : 2) : 0;
