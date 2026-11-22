@@ -1421,6 +1421,7 @@ function renderJobs() {
     // This estimate includes the actual marginal restock cost of the consumed supply,
     // but excludes performance bonuses and penalties.
     const grossEstimate = j.pay * (state.surgeJobs > 0 ? 2 : 1);
+    const fastBonusEstimate = Math.round(j.pay * 0.08);
     const projected = Math.max(0, grossEstimate - overhead - supplyCost);
     const risk = getDispatchRiskScore(j);
     const isRecommendedFirstCall = !!firstCallRecommendation && firstCallRecommendation.index === jobIndex;
@@ -1455,10 +1456,11 @@ function renderJobs() {
           <span>⏱ ${j.timeLimit}s SLA</span>
         </div>
         <div class="dispatch-net-breakdown" style="display:flex;flex-wrap:wrap;gap:6px 12px;padding:7px 9px;margin:5px 0;background:rgba(15,23,42,.42);border-radius:7px;font-size:10px;color:var(--muted);">
-          <span>Gross: <strong style="color:var(--text);">${Math.round(grossEstimate)}</strong></span>
+          <span>Gross if accepted now: <strong style="color:var(--text);">${Math.round(grossEstimate)}</strong></span>
           <span>Supply reserve: <strong style="color:var(--text);">−${Math.round(supplyCost)}</strong></span>
           <span>Operating overhead: <strong style="color:var(--text);">−${Math.round(overhead)}</strong></span>
-          <span style="width:100%;font-size:9px;">Estimate excludes speed bonuses and any penalties.</span>
+          <span>Fast-finish bonus if eligible: <strong style="color:var(--green);">+${fastBonusEstimate}</strong></span>
+          <span style="width:100%;font-size:9px;">Net estimate excludes the conditional fast-finish bonus and any penalties. Surge applies only to the next call you accept.</span>
         </div>
         <div class="job-meta">
           <span>🛞 ${heavy ? 'HD Tire' : 'Std Tire'} · ${j.veh.targetPsi} PSI${hazardBadge}${lockBadge}</span>
