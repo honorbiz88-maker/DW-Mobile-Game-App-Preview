@@ -1021,7 +1021,7 @@ function triggerDispatchScan(mode) {
 
 function triggerSurgeAction() {
   const remMs = syncSurgeRecharge();
-  const hasAdCharge = state.surgeCharges > 0;
+  const hasFreeCharge = state.surgeCharges > 0;
   openModal(`
     <span class="badge">2X SURGE DISPATCH MULTIPLIER</span>
     <h3>Boost Next Call Payout (2x)</h3>
@@ -1029,8 +1029,8 @@ function triggerSurgeAction() {
       Active queued Surges: <strong style="color:var(--amber);">${state.surgeJobs}</strong> · Free charges: <strong style="color:var(--green);">${state.surgeCharges}/${MAX_SURGE_CHARGES}</strong>
       ${state.surgeCharges < MAX_SURGE_CHARGES ? `<br>Next free charge in <strong>${formatMs(remMs)}</strong> (12-hour recharge).` : ''}
     </p>
-    <button class="secondary-btn" ${!hasAdCharge ? 'disabled' : ''} onclick="closeModal(); activateFreeSurge();">
-      ${hasAdCharge ? `⚡ USE FREE SURGE CHARGE (${state.surgeCharges} LEFT)` : `⏳ FREE SURGE RECHARGING (${formatMs(remMs)})`}
+    <button class="secondary-btn" ${!hasFreeCharge ? 'disabled' : ''} onclick="closeModal(); activateFreeSurge();">
+      ${hasFreeCharge ? `⚡ USE FREE SURGE CHARGE (${state.surgeCharges} LEFT)` : `⏳ FREE SURGE RECHARGING (${formatMs(remMs)})`}
     </button>
     <button class="primary-btn" onclick="closeModal(); activateInstantSurgeToken();">
       ⚡ INSTANT +1 SURGE (3 ⚡ TOKENS)
@@ -1122,8 +1122,8 @@ function updateHUD() {
   const boostLbl = document.getElementById('dispatch-boost-label');
   if (boostLbl) {
     boostLbl.textContent = state.surgeJobs > 0
-      ? `2X SURGE: ${state.surgeJobs} ACTIVE (${state.surgeCharges}/${MAX_SURGE_CHARGES} AD)`
-      : `2X SURGE (${state.surgeCharges}/${MAX_SURGE_CHARGES} AD)`;
+      ? `2X SURGE: ${state.surgeJobs} ACTIVE · ${state.surgeCharges}/${MAX_SURGE_CHARGES} FREE`
+      : `2X SURGE (${state.surgeCharges}/${MAX_SURGE_CHARGES} FREE)`;
   }
   renderContractBanner();
   renderStockBar();
@@ -2608,7 +2608,7 @@ function renderShop() {
       <h3>Dispatch abilities</h3>
       <div class="shop-recharge-row"><span>⚡ 2X Surge charges</span><strong>${state.surgeCharges}/${MAX_SURGE_CHARGES}</strong></div>
       <p style="font-size:11px;color:var(--muted);">${surgeCdTxt} · Recharges automatically.</p>
-      <div class="shop-recharge-row"><span>📡 Dispatch scan drops</span><strong>${state.dispatchScans}/${MAX_DISPATCH_SCANS}</strong></div>
+      <div class="shop-recharge-row"><span>📡 Free dispatch scans</span><strong>${state.dispatchScans}/${MAX_DISPATCH_SCANS}</strong></div>
       <p style="font-size:11px;color:var(--muted);">${state.dispatchScans >= MAX_DISPATCH_SCANS ? 'Fully recharged' : `Next scan: ${formatMs(syncDispatchScanRecharge())}`} · Recharges automatically.</p>
     </div>
 
