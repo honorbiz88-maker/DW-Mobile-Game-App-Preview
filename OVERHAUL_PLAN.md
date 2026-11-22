@@ -101,24 +101,44 @@ Career milestones add up to 15 more by call 275. Contract Gears are additional a
 - Clean-streak and career Gear rewards can supply the 75-Gear progression requirement for engaged players; contract rewards add further Gears. Low-clean-rate players need more contract participation. These are expected-value estimates, not observed player telemetry.
 - Rig maintenance now has a capped operating-overhead effect (0–20%) and service costs $1.50 per condition point restored. It is a modest operating incentive, not a hard failure gate.
 - Dispatch estimates subtract the estimated replacement cost of the consumed supply. The estimate excludes performance bonuses and penalties by design.
-- A provisional cash-flow simulation indicates that full max-level progression is a multi-thousand-call career. The estimate assumes 70% fast completions, Elite 5-star payout tier, 75% clean calls for Gear yield, two free Surges used per day, one contract claimed about every 10 calls, strategic territory selection, and estimated contract/VIP value. It is sensitive to actual play frequency, contract cadence, Surge use, penalties, and inventory behavior; use it as a pacing warning, not a release promise.
+- A source-driven Monte Carlo audit now models the actual dispatch pool, weather, rust and wheel-lock chances, payout/rating tiers, contract objective pool and reward snapshots, contract Gear drops, career Gear milestones, clean-streak rollover, free Surge recharge, VIP token costs, rig wear/service, supply replacement, and upgrade/commission costs. This supersedes the earlier simplified one-contract-per-10-calls estimate.
+- The model assumes the player always chooses the highest unlocked territory, buys upgrades in a balanced order, accepts VIP calls when offered and affordable, and claims completed contracts after the modeled delay. It uses aggregate clean/fast probabilities and average penalty amounts rather than simulating every individual bay mistake.
+- Supply costs are modeled at long-run replacement cost per call. The model does **not** yet simulate finite stock inventory, cargo-capacity restocking, or a cash-starved player being unable to buy the next supply. Results are directional pacing estimates, not observed telemetry or a release promise.
 
-| Calls per day | Modeled calls to max progression | Modeled calendar days |
-|---:|---:|---:|
-| 3 | 1,995 | 665 |
-| 5 | 2,343 | 469 |
-| 10 | 2,706 | 271 |
-| 15 | 2,859 | 191 |
-| 25 | 2,993 | 120 |
-| 40 | 3,076 | 77 |
+### Economy stress test — 2026-11-22
 
-The model treats free Surge use as up to two charges per day and approximates VIP selection and contract cash/REP as expected values. It does not model real player behavior or claim timing. The large modeled Gear surplus suggests cash, not Gold Gears, is the primary late-game pacing constraint under these assumptions.
+Each scenario uses 30 seeded runs. Calls are median completion counts to all four tools at Level 24 and Rig Tier 6; the range is the 10th–90th percentile. Calendar days assume 10 completed calls per day.
+
+| Scenario | Main assumptions | Calls to max progression |
+|---|---|---:|
+| Strong execution | 90% clean, 85% fast, $10 average penalty on non-clean calls, 2 free Surges/day, prompt rig service, immediate contract claims | **2,471** (2,433–2,519) |
+| Typical execution | 75% clean, 65% fast, $30 average penalty on non-clean calls, 2 free Surges/day, prompt service, immediate claims | **2,604** (2,564–2,632) |
+| Rough execution | 55% clean, 40% fast, $50 average penalty on non-clean calls, 1 free Surge/day, prompt service, 2-call contract-claim delay | **3,320** (3,264–3,376) |
+| Rough, no Surges | Same rough-play assumptions, but no free Surge use | **3,676** (3,625–3,740) |
+| Poor execution | 35% clean, 30% fast, $60 average penalty on non-clean calls, no Surges, prompt service, 5-call claim delay | **4,440** (4,365–4,484) |
+| Standard-tier stress | 25% clean, 20% fast, $100 average penalty on non-clean calls, no Surges, prompt service, 5-call claim delay | **5,646** (5,481–5,786) |
+
+Additional comparisons:
+- Typical play with a 5-call delay before claiming each completed contract takes **2,838 calls** (2,817–2,887), about 9% longer than immediate claims. A contract that is completed but never claimed blocks the next contract from being issued; the current game intentionally requires a manual claim.
+- Typical play with no rig servicing takes **2,634 calls** (2,588–2,652), versus 2,604 with prompt service. Neglecting service saves service fees but increases operating overhead after condition falls.
+- With typical play and immediate claims, the model completes about **345 contracts** and earns roughly **680 Gold Gears beyond the 75 needed** for all tool breakthroughs and rig commissions. Even the Standard-tier stress case finishes with a positive Gear balance. Gold Gears are therefore not the modeled progression bottleneck; cash and contract cadence are.
+- Typical and rough cases finish with only a modest cash reserve after all purchases. Cash remains the binding progression resource, and the model is deliberately not being used to justify another cost increase.
+- Contract cadence is not fixed at one every 10 calls. It emerges from the five objective types: clean streaks can reset, plugs occur on one of five damage rolls, swaps on four of five, fast completions depend on player skill, and heavy contracts require a heavy vehicle **and** a swap. The simulated typical case averages about one completed contract every 7–8 calls; rough play takes longer.
+
+### What this means for balancing
+
+1. Do not increase upgrade, rig, or supply costs. The rough scenarios already extend the career substantially and leave little cash reserve.
+2. Do not increase Gold Gear rewards. The current streak, career, and contract awards produce a large surplus in the modeled cases. If Gold Gears remain a premium-currency candidate, design optional cosmetic or long-term sinks before relying on direct Gear sales.
+3. Keep free Surge use meaningful. Removing it increases the typical progression estimate by roughly 17% in the matched no-Surge run.
+4. Preserve contract rewards, but make the claim state more noticeable in playtesting. A completed-but-unclaimed contract blocks the next assignment and its rewards.
+5. Test inventory and cash-starvation recovery in a real browser before making further economy changes. The simulation does not yet model stockouts or a player who cannot afford a replacement kit/tire.
+
 
 ### Remaining validation
 
-1. Run repeatable Monte Carlo simulations with actual dispatch and repair distributions, contract objective completion, Surge recharge, and inventory timing.
+1. Add finite-stock, cargo-capacity, restock affordability, and cash-starvation recovery to the progression simulation; compare model results with real playtest telemetry.
 2. Validate time-to-unlock for each tool tier, rig tier, and territory against intended career pacing.
-3. Test low/average/high performance and missed-contract scenarios; identify whether late-game cash costs create an excessive grind.
+3. Playtest low/average/high performance, contract-claim visibility, and players who miss or delay contract claims; verify the recovery path for low-cash players.
 4. Review edge cases in ratings, Surge, dispatch refresh, and save migration.
 5. Make only evidence-backed balance changes; preserve approved progression decisions unless measured results justify a change.
 
