@@ -229,6 +229,7 @@ let state = {
   customerLedger: {},
   rigCondition: 100,
   contractsCompleted: 0,
+  claimedCareerGearMilestones: [],
   jobs: [],
   activeJob: null
 };
@@ -266,6 +267,8 @@ function loadState() {
     if (!Number.isFinite(state.rigCondition)) state.rigCondition = 100;
     state.rigCondition = Math.max(0, Math.min(100, state.rigCondition));
     if (!Number.isFinite(state.contractsCompleted)) state.contractsCompleted = 0;
+    // Mark already-reached milestones as claimed in legacy saves to prevent duplicate grants.
+    if (!Array.isArray(state.claimedCareerGearMilestones)) state.claimedCareerGearMilestones = [10,30,60,100,175,275].filter((m) => (state.jobsCompleted || 0) >= m);
     if (!Array.isArray(state.jobs)) state.jobs = [];
     state.jobs = state.jobs.filter((j) => j && j.veh && typeof j.veh === 'object' && j.dmg && typeof j.dmg === 'object');
     if (state.activeJob && (!state.activeJob.veh || typeof state.activeJob.veh !== 'object' || !state.activeJob.dmg || typeof state.activeJob.dmg !== 'object')) {
@@ -2140,11 +2143,6 @@ function completeJob() {
   const overheadFee = getFleetOverheadFee(job);
   const totalDeductions = job.penalties + overheadFee;
   const net = Math.max(15, gross + speedBonus - totalDeductions);
-  const customerKey = job.customer || 'Roadside Customer';
-  const priorVisits = Math.max(0, Number(state.customerLedger[customerKey]) || 0);
-  const repeatBonusRate = priorVisits >= 4 ? 0.08 : priorVisits >= 2 ? 0.05 : 0;
-  const repeatBonus = repeatBonusRate > 0 ? Math.round(gross * repeatBonusRate) : 0;
-
   const z = getZone();
   const fallbackBaseRep = Math.round(((job.dmg && job.dmg.action === 'swap' ? 32 : 24) + (job.veh && job.veh.heavy ? 12 : 0)) * z.mult);
   const rawJobRep = job.baseRep || fallbackBaseRep;
@@ -2155,9 +2153,16 @@ function completeJob() {
   state.rep = Math.max(0, state.rep + netRep);
 
   const isCleanJob = job.penalties === 0;
-  state.cash += net + repeatBonus;
-  state.customerLedger[customerKey] = priorVisits + 1;
+  state.cash += net;
   state.jobsCompleted = (state.jobsCompleted || 0) + 1;
+  const careerGearAwards = {10:1,30:2,60:2,100:3,175:3,275:4};
+  const claimed = state.claimedCareerGearMilestones;
+  let earnedCareerGear = 0;
+  Object.entries(careerGearAwards).forEach(([count, reward]) => {
+    const milestone = Number(count);
+    if (state.jobsCompleted >= milestone && !claimed.includes(milestone)) { earnedCareerGear += reward; claimed.push(milestone); }
+  });
+  if (earnedCareerGear > 0) state.parts += earnedCareerGear;
   state.rigCondition = Math.max(0, (Number(state.rigCondition) || 100) - (job.veh && job.veh.heavy ? 2.5 : 1.5));
   if (isCleanJob) state.streak = (state.streak || 0) + 1;
   else state.streak = 0;
@@ -2199,13 +2204,13 @@ function completeJob() {
     <div style="background:#090c12;padding:12px;border-radius:10px;font-size:13px;display:flex;flex-direction:column;gap:6px;">
       <div style="display:flex;justify-content:space-between;"><span>Base + Weather Payout:</span><strong style="color:var(--green);">+$${gross}</strong></div>
       <div style="display:flex;justify-content:space-between;"><span>Fast-Response Bonus:</span><strong style="color:var(--blue);">+${speedBonus}</strong></div>
-      ${repeatBonus > 0 ? `<div style="display:flex;justify-content:space-between;"><span>Repeat Customer Loyalty (${Math.round(repeatBonusRate * 100)}%):</span><strong style="color:var(--amber);">+${repeatBonus}</strong></div>` : priorVisits > 0 ? `<div style="color:var(--muted);font-size:11px;">Customer relationship: visit ${priorVisits + 1} · loyalty bonus unlocks after 3 completed visits.</div>` : ''}
       <div style="display:flex;justify-content:space-between;"><span>Fleet Fuel & Dispatch Overhead:</span><strong style="color:var(--muted);">-$${overheadFee}</strong></div>
       ${job.penalties > 0 ? `<div style="display:flex;justify-content:space-between;"><span>Bay & SLA Penalties:</span><strong style="color:var(--red);">-$${job.penalties}</strong></div>` : ''}
       ${logHtml}
       <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:6px;"><span>Net Collected:</span><strong style="color:var(--green);">$${net}</strong></div>
       <div style="display:flex;justify-content:space-between;"><span>Corridor REP (${baseRep} - ${repDeductions} pen):</span><strong style="color:${netRep >= 0 ? 'var(--amber)' : 'var(--red)'};">${netRep >= 0 ? '+' : ''}${netRep} REP</strong></div>
       ${earnedStreakGear > 0 ? `<div style="color:var(--amber);font-weight:800;">+${earnedStreakGear} Gold Gear${earnedStreakGear > 1 ? 's' : ''} (⚙️) · Clean Streak Milestone!</div>` : ''}
+      ${earnedCareerGear > 0 ? `<div style="color:var(--green);font-weight:800;">+${earnedCareerGear} Gold Gear${earnedCareerGear > 1 ? 's' : ''} (⚙️) · Career Call Milestone!</div>` : ''}
     </div>
     <button type="button" class="primary-btn" onclick="closeModal(); goPage('dispatch');">RETURN TO DISPATCH</button>
   `);
@@ -2392,8 +2397,8 @@ function renderGarage() {
       ${isUnlocked
         ? `✓ ACTIVE FLEET RIG (${rig.mult.toFixed(2)}x PAYOUTS)`
         : meetsTools
-          ? `COMMISSION RIG: $${rig.cashCost.toLocaleString()} + ${rig.partCost} ⚙️ + ${rig.tokenCost} ⚡`
-          : `LOCKED · ALL TOOLS LVL ${rig.reqLvl}+ ($${rig.cashCost.toLocaleString()} + ${rig.partCost}⚙️ + ${rig.tokenCost}⚡)`}
+          ? `COMMISSION RIG: ${rig.cashCost.toLocaleString()} + ${rig.partCost} ⚙️`
+          : `LOCKED · ALL TOOLS LVL ${rig.reqLvl}+ (${rig.cashCost.toLocaleString()} + ${rig.partCost}⚙️)`}
     </button>
   `;
 
