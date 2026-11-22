@@ -17,6 +17,7 @@ const firebaseConfig = {
 };
 
 const LOCAL_KEY = "delwin_v4_save";
+const OWNER_KEY = "delwin_cloud_owner_uid";
 const SCHEMA_VERSION = 1;
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -90,7 +91,7 @@ function localSnapshot() {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? { raw, payload: parsed } : { raw, invalid: true };
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? { raw, payload: parsed, ownerUid: localStorage.getItem(OWNER_KEY) } : { raw, invalid: true };
   } catch {
     status("The local career save could not be read. It has not been changed; contact support before resetting browser data.", true);
     return { raw, invalid: true };
@@ -154,9 +155,14 @@ async function reconcile(user) {
     const local = localSnapshot();
     if (local?.invalid) return;
     if (!snap.exists()) {
+      if (local?.ownerUid && local.ownerUid !== user.uid) {
+        status("This device's career is linked to another account. Nothing was uploaded. Sign back into that account or restore it from a cloud backup.", true);
+        return;
+      }
       if (local) {
         await writeCloud(local.payload, user.uid);
         if (!currentUser || currentUser.uid !== user.uid) return;
+        localStorage.setItem(OWNER_KEY, user.uid);
         status("Your existing device career is backed up to your account.");
       } else {
         status("Account connected. Your career will sync after your first save.");
@@ -171,11 +177,13 @@ async function reconcile(user) {
     }
     if (!local) {
       localStorage.setItem(LOCAL_KEY, JSON.stringify(cloud.payload));
+      localStorage.setItem(OWNER_KEY, user.uid);
       status("Cloud career restored to this device.");
       location.reload();
       return;
     }
     if (JSON.stringify(local.payload) === JSON.stringify(cloud.payload)) {
+      localStorage.setItem(OWNER_KEY, user.uid);
       syncReady = true;
       status("Account connected · local and cloud careers match.");
       return;
@@ -191,9 +199,12 @@ async function keepLocal() {
   const pending = window.DelWinCloud.pendingConflict;
   if (!pending || !currentUser || pending.uid !== currentUser.uid) return;
   try {
-    localStorage.setItem(`delwin_cloud_backup_${currentUser.uid}_${Date.now()}`, JSON.stringify(pending.cloudData));
+    if (pending.cloudData) {
+      localStorage.setItem(`delwin_cloud_backup_${currentUser.uid}_${Date.now()}`, JSON.stringify(pending.cloudData));
+    }
     await writeCloud(JSON.parse(pending.localRaw), pending.uid);
     if (!currentUser || currentUser.uid !== pending.uid) return;
+    localStorage.setItem(OWNER_KEY, pending.uid);
     syncReady = true;
     window.DelWinCloud.pendingConflict = null;
     window.closeModal?.();
@@ -208,6 +219,7 @@ function keepCloud() {
   try {
     backupLocal(pending.localRaw);
     localStorage.setItem(LOCAL_KEY, JSON.stringify(pending.cloudData.payload));
+    localStorage.setItem(OWNER_KEY, currentUser.uid);
     window.DelWinCloud.pendingConflict = null;
     syncReady = true;
     window.closeModal?.();
@@ -221,6 +233,10 @@ function pendingBelongsToUser(pending, user) {
 }
 function queueSave(payload) {
   if (!currentUser || !syncReady || busy || !navigator.onLine) return;
+  if (localStorage.getItem(OWNER_KEY) !== currentUser.uid) {
+    status("Cloud sync paused: this device's career belongs to a different account.", true);
+    return;
+  }
   const queuedUid = currentUser.uid;
   pendingPayload = { uid: queuedUid, payload: JSON.parse(JSON.stringify(payload)) };
   clearTimeout(syncTimer);
