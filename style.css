@@ -162,6 +162,7 @@ button, .lug-btn, .hud-pill-compact {
 }
 
 .primary-btn {
+  min-height: 44px;
   width: 100%;
   background: var(--amber);
   color: #090c12;
@@ -179,6 +180,7 @@ button, .lug-btn, .hud-pill-compact {
 }
 
 .secondary-btn {
+  min-height: 44px;
   width: 100%;
   background: #1e293b;
   color: var(--text);
@@ -200,6 +202,7 @@ button, .lug-btn, .hud-pill-compact {
 }
 
 .ghost-btn {
+  min-height: 44px;
   background: transparent;
   color: var(--amber);
   border: 1px solid var(--border);
@@ -399,8 +402,8 @@ button, .lug-btn, .hud-pill-compact {
 .lug-btn {
   position: absolute;
   transform: translate(-50%, -50%);
-  width: 24px;
-  height: 24px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   border: 2px solid #e2e8f0;
   background: #1e293b;
