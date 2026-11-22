@@ -272,6 +272,11 @@ function loadState() {
     }
     if (!ZONES.some((z) => z.id === state.zoneId)) state.zoneId = 'z1';
     if (!state.contract || typeof state.contract !== 'object') rollNewContract();
+    // Heavy-fleet objectives are only assigned after freight dispatch is unlocked.
+    // Replace an untouched legacy objective that cannot yet be completed.
+    if (state.contract && state.contract.type === 'heavy' && !canDispatchHeavyJobs() && (state.contract.progress || 0) === 0) {
+      rollNewContract();
+    }
     // Backfill reward snapshots for contracts already in existing player saves.
     if (!Number.isFinite(state.contract.rewardZoneMult)) state.contract.rewardZoneMult = getZone().mult;
     if (!Number.isFinite(state.contract.rewardContractRank)) state.contract.rewardContractRank = Math.max(1, (state.contractsCompleted || 0) + 1);
@@ -747,9 +752,18 @@ function saveProfileEdits() {
 }
 
 // --- CONTRACTS ---
+function canDispatchHeavyJobs() {
+  const zone = getZone();
+  return zone.hubNum >= 2 && getRigTier() >= 2;
+}
+
+function isContractAvailable(contract) {
+  return contract && (contract.type !== 'heavy' || canDispatchHeavyJobs());
+}
+
 function rollNewContract() {
   const currentId = state.contract ? state.contract.id : '';
-  const options = CONTRACT_POOL.filter((c) => c.id !== currentId);
+  const options = CONTRACT_POOL.filter((c) => c.id !== currentId && isContractAvailable(c));
   const pick = options[Math.floor(Math.random() * options.length)];
   const contractRank = Math.max(1, (state.contractsCompleted || 0) + 1);
   const contractBonusRate = Math.min(0.30, Math.floor((contractRank - 1) / 2) * 0.05);
@@ -1226,7 +1240,7 @@ function generateJob(vip = false) {
   const rig = RIG_TIERS[getRigTier() - 1] || RIG_TIERS[0];
   // Keep freight-class calls out of early metro zones and gate them behind
   // the first upgraded rig, even if a player reaches a freight zone early on REP.
-  const canDispatchHeavy = z.hubNum >= 2 && rig.tier >= 2;
+  const canDispatchHeavy = canDispatchHeavyJobs();
   // VIP commercial contracts are freight-only and unlock with the freight fleet.
   vip = vip && canDispatchHeavy;
   const standardPool = canDispatchHeavy ? VEHICLES : VEHICLES.filter((vehicle) => !vehicle.heavy);
@@ -1297,7 +1311,7 @@ function generateJob(vip = false) {
 function refreshJobs() {
   const rInfo = getRatingTierInfo();
   const z = getZone();
-  const canOfferVip = z.hubNum >= 2 && getRigTier() >= 2;
+  const canOfferVip = canDispatchHeavyJobs();
   const hasVipSlot = canOfferVip && Math.random() < rInfo.vipChance;
   state.jobs = [
     generateJob(false),
@@ -2249,7 +2263,10 @@ function completeJob() {
 
   if (state.contract && state.contract.progress < state.contract.target) {
     const ct = state.contract.type;
-    if (ct === 'clean_streak' && isCleanJob) state.contract.progress += 1;
+    // A zero-penalty streak must be consecutive; any penalized call breaks it.
+    if (ct === 'clean_streak') {
+      state.contract.progress = isCleanJob ? state.contract.progress + 1 : 0;
+    }
     if (ct === 'plugs' && job.dmg.action === 'plug') state.contract.progress += 1;
     if (ct === 'swaps' && job.dmg.action === 'swap') state.contract.progress += 1;
     if (ct === 'fast' && isFast) state.contract.progress += 1;
