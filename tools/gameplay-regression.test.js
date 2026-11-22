@@ -80,6 +80,28 @@ test('cloud writes and conflict choices remain bound to the originating account'
   assert.match(cloudSource, /pendingConflict = null;[\s\S]*?busy = false;/);
 });
 
+test('cloud writes are serialized and retain failed saves for automatic retry', () => {
+  assert.match(cloudSource, /let writing = false;/);
+  assert.match(cloudSource, /async function flushPendingSave\(expectedUid\)/);
+  assert.match(cloudSource, /if \(writing\) return;/);
+  assert.match(cloudSource, /writing = true;/);
+  assert.match(cloudSource, /await writeCloud\(next, expectedUid\)/);
+  assert.match(cloudSource, /pendingPayload = \{ uid: expectedUid, payload: next \}/);
+  assert.match(cloudSource, /retryDelay = 5000/);
+  assert.match(cloudSource, /retrying automatically/);
+  assert.match(cloudSource, /if \(currentUser && syncReady && pendingBelongsToUser\(pendingPayload, currentUser\)\)/);
+  assert.match(cloudSource, /setTimeout\(\(\) => flushPendingSave\(nextUid\), retryDelay\)/);
+});
+
+test('cloud save queue does not discard gameplay state while reconciliation is busy', () => {
+  const start = cloudSource.indexOf('async function flushPendingSave');
+  const end = cloudSource.indexOf('function queueSave', start);
+  const flush = cloudSource.slice(start, end);
+  assert.match(flush, /if \(busy\) \{[\s\S]*?setTimeout\(\(\) => flushPendingSave\(expectedUid\), 1400\)/);
+  assert.ok(flush.indexOf('if (busy)') < flush.indexOf('writing = true;'),
+    'A save must wait for reconciliation to finish before beginning its write');
+});
+
 test('account-mismatched save conflict does not offer an unsafe keep-local upload', () => {
   const start = cloudSource.indexOf('function showConflict(');
   const end = cloudSource.indexOf('async function writeCloud', start);
