@@ -1566,7 +1566,10 @@ function generateJob(vip = false) {
   // Keep freight-class calls out of early metro zones and gate them behind
   // the first upgraded rig, even if a player reaches a freight zone early on REP.
   const canDispatchHeavy = z.hubNum >= 2 && rig.tier >= 2;
-  const pool = canDispatchHeavy ? VEHICLES : VEHICLES.filter((vehicle) => !vehicle.heavy);
+  // VIP commercial contracts are freight-only and unlock with the freight fleet.
+  vip = vip && canDispatchHeavy;
+  const standardPool = canDispatchHeavy ? VEHICLES : VEHICLES.filter((vehicle) => !vehicle.heavy);
+  const pool = vip ? VEHICLES.filter((vehicle) => vehicle.heavy) : standardPool;
   const veh = pool[Math.floor(Math.random() * pool.length)];
   const dmg = DAMAGES[Math.floor(Math.random() * DAMAGES.length)];
   const weather = WEATHER_CONDITIONS[Math.floor(Math.random() * WEATHER_CONDITIONS.length)];
@@ -1630,12 +1633,14 @@ function generateJob(vip = false) {
 
 function refreshJobs() {
   const rInfo = getRatingTierInfo();
-  const hasVipSlot = Math.random() < rInfo.vipChance;
+  const z = getZone();
+  const canOfferVip = z.hubNum >= 2 && getRigTier() >= 2;
+  const hasVipSlot = canOfferVip && Math.random() < rInfo.vipChance;
   state.jobs = [
     generateJob(false),
     generateJob(false),
     generateJob(false),
-    generateJob(rInfo.vipChance > 0 && hasVipSlot)
+    generateJob(hasVipSlot)
   ];
   renderJobs();
 }
