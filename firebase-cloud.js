@@ -69,6 +69,24 @@ function credentials() {
     password: document.getElementById("cloud-password")?.value || ""
   };
 }
+async function diagnoseAuthApiKey() {
+  try {
+    // Deliberately invalid credentials ensure this probe cannot create an account.
+    const response = await fetch(
+      "https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=" + encodeURIComponent(firebaseConfig.apiKey),
+      { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: "diagnostic-invalid-email", password: "x", returnSecureToken: true }) }
+    );
+    const result = await response.json().catch(() => ({}));
+    const backendCode = result?.error?.message || ("HTTP " + response.status);
+    if (/API_KEY_INVALID|API key not valid|API_KEY_SERVICE_BLOCKED/i.test(backendCode)) {
+      return "Direct Identity Toolkit probe also rejected the configured key: " + backendCode + ".";
+    }
+    return "Direct Identity Toolkit probe reached Firebase; safe invalid-input check returned: " + backendCode + ".";
+  } catch (error) {
+    return "Direct Identity Toolkit probe could not complete: " + (error.message || "network error") + ".";
+  }
+}
 async function runAuth(action, pendingMessage, successMessage, operation = "Authentication") {
   status(pendingMessage);
   try {
@@ -86,8 +104,12 @@ async function runAuth(action, pendingMessage, successMessage, operation = "Auth
       "auth/operation-not-allowed": "Email and password sign-in is not enabled for this game yet. Please try again later."
     };
     const detail = messages[error.code] || error.message || "Account request failed.";
+    // The probe uses invalid credentials, so it cannot create an account.
+    const keyDiagnostic = error.code === "auth/api-key-not-valid.-please-pass-a-valid-api-key."
+      ? " " + await diagnoseAuthApiKey()
+      : "";
     // Show a safe diagnostic without exposing credentials or request URLs.
-    status(`${operation} failed [${error.code || "unknown"}]: ${detail}`, true);
+    status(`${operation} failed [${error.code || "unknown"}]: ${detail}${keyDiagnostic}`, true);
   }
 }
 function localSnapshot() {
