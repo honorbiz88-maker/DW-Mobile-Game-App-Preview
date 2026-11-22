@@ -226,6 +226,23 @@ async function reconcile(user) {
         return;
       }
     }
+    // Once this device is linked to the signed-in account, the cloud career is
+    // authoritative on launch. Treat local storage as a cache, not a second
+    // competing career; preserve any divergent device copy as a recoverable backup.
+    if (local?.ownerUid === user.uid && snap.exists()) {
+      const cloudData = snap.data();
+      if (cloudData?.schemaVersion === SCHEMA_VERSION && cloudData.payload && typeof cloudData.payload === "object" && !Array.isArray(cloudData.payload)) {
+        if (JSON.stringify(local.payload) !== JSON.stringify(cloudData.payload)) {
+          backupLocal(local.raw, "before-cloud-refresh");
+          localStorage.setItem(LOCAL_KEY, JSON.stringify(cloudData.payload));
+          localStorage.setItem(OWNER_KEY, user.uid);
+          syncReady = false;
+          status("Cloud career restored. Your previous device copy is backed up.");
+          location.reload();
+          return;
+        }
+      }
+    }
     if (local?.ownerUid && local.ownerUid !== user.uid) {
       if (snap.exists()) {
         const cloudData = snap.data();
