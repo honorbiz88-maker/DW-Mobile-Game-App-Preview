@@ -1602,6 +1602,15 @@ test('cloud restore marker survives reload without relying on Firestore timestam
   assert.deepEqual(JSON.parse(second.store.get('delwin_v4_save')), cloudCareer);
 });
 
+test('gameplay save routine defers local writes while an accepted cloud restore is pending', () => {
+  const start = gameSource.indexOf('function saveState()');
+  const end = gameSource.indexOf('function syncPoolRecharge', start);
+  const save = gameSource.slice(start, end);
+  assert.match(save, /DelWinCloud\?\.isRestorePending\?\.\(\)\) return/);
+  assert.ok(save.indexOf('isRestorePending') < save.indexOf("localStorage.setItem('delwin_v4_save'"),
+    'The restore guard must run before any local save write');
+});
+
 test('cloud restore overrides a boot-normalized device save and keeps it only as a backup', async () => {
   const cloudCareer = { cash: 120, jobsCompleted: 4 };
   const normalizedLocalCareer = { cash: 120, jobsCompleted: 4, migrated: true };
