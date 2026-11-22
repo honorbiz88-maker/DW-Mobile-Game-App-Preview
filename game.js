@@ -204,6 +204,7 @@ let state = {
   hdTires: 1,
   ratings: [5.0, 5.0, 5.0, 5.0, 5.0],
   tutorialDone: false,
+  firstDispatchBriefingSeen: null,
   contract: {
     id: 'c_clean4',
     title: 'Zero-Penalty Streak',
@@ -258,6 +259,7 @@ function loadState() {
         }
       }
     }
+    if (typeof state.firstDispatchBriefingSeen !== 'boolean') state.firstDispatchBriefingSeen = (state.jobsCompleted || 0) > 0;
     if (!Array.isArray(state.ratings) || state.ratings.length === 0) state.ratings = [5.0];
     if (!state.customerLedger || typeof state.customerLedger !== 'object' || Array.isArray(state.customerLedger)) state.customerLedger = {};
     if (!Number.isFinite(state.rigCondition)) state.rigCondition = 100;
@@ -1223,6 +1225,33 @@ function updateHUD() {
   renderProfileCard();
 }
 
+function showFirstDispatchBriefing() {
+  if (!state.tutorialDone || state.firstDispatchBriefingSeen) return;
+  state.firstDispatchBriefingSeen = true;
+  saveState();
+  openModal(`
+    <span class="badge">YOUR FIRST LIVE CALL</span>
+    <h3>Welcome to live dispatch.</h3>
+    <p style="font-size:13px;color:var(--muted);">Training taught you the repair. Now build your roadside business one completed call at a time.</p>
+    <div style="display:grid;gap:9px;margin:12px 0;">
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:10px;">
+        <strong style="color:var(--green);">1. Choose your call carefully</strong>
+        <p style="font-size:12px;color:var(--muted);margin:4px 0 0;">Compare the NET EST. AFTER SUPPLIES amount and check the vehicle, damage, and job risks before accepting.</p>
+      </div>
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:10px;">
+        <strong style="color:var(--blue);">2. Work safely and follow the stages</strong>
+        <p style="font-size:12px;color:var(--muted);margin:4px 0 0;">Set cones and chocks first. Scan the tire, choose the correct repair, calibrate PSI, torque in star order, then lower and stow.</p>
+      </div>
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:10px;">
+        <strong style="color:var(--amber);">3. Protect your earnings</strong>
+        <p style="font-size:12px;color:var(--muted);margin:4px 0 0;">Calls consume supplies and include operating overhead. Avoid mistakes and penalties to keep more of each payout.</p>
+      </div>
+    </div>
+    <p style="font-size:11px;color:var(--muted);">Your dispatch estimate is not a guaranteed final payout; speed bonuses and any penalties affect the result.</p>
+    <button type="button" class="primary-btn" onclick="closeModal()">GOT IT · SHOW DISPATCH</button>
+  `);
+}
+
 function goPage(pageId) {
   stopHoldPsi();
   document.querySelectorAll('.page').forEach((p) => p.classList.remove('active'));
@@ -1235,6 +1264,7 @@ function goPage(pageId) {
     renderStockBar();
     renderRatingPerkBanner();
     renderDispatchScanControl();
+    showFirstDispatchBriefing();
   }
   if (pageId === 'garage') {
     previewRigTier = getRigTier();
@@ -2864,6 +2894,7 @@ function bootDelWinMobile() {
     if (state.activeJob && !state.activeJob.isTutorial) startBayTimer();
     if (!state.tutorialDone) startTutorial();
   } catch (e) {}
+  if (state.tutorialDone && !state.firstDispatchBriefingSeen) showFirstDispatchBriefing();
 }
 
 if (document.readyState === 'loading') {
