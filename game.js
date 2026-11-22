@@ -1215,32 +1215,52 @@ function refreshJobs() {
 
 function renderJobs() {
   const wrap = document.getElementById('job-list');
+  if (!wrap) return;
   const radarLvl = state.tools.radar.level;
   wrap.innerHTML = state.jobs.map((j) => {
     const w = j.weather || WEATHER_CONDITIONS[0];
+    const heavy = !!j.veh.heavy;
+    const needsTire = j.dmg && j.dmg.action === 'swap';
+    const stockReady = needsTire
+      ? (heavy ? state.hdTires > 0 : state.stdTires > 0)
+      : state.plugs > 0;
+    const overhead = getFleetOverheadFee(j);
+    const projected = Math.max(15, j.pay * (state.surgeJobs > 0 ? 2 : 1) - overhead);
+    const risk = (j.isRusted ? 2 : 0) + (j.hasWheelLock ? 1 : 0) + (w.id === 'rain' || w.id === 'night' ? 1 : 0) + (heavy ? 1 : 0) + (j.vip ? 2 : 0);
+    const riskLabel = risk >= 5 ? 'HIGH RISK' : risk >= 3 ? 'MODERATE' : 'ROUTINE';
+    const riskColor = risk >= 5 ? '#fb7185' : risk >= 3 ? '#fbbf24' : '#34d399';
     const hazardBadge = radarLvl >= 2 && j.isRusted
-      ? `<span style="color:#f97316;font-weight:800;"> · 🔩 SEIZED LUGS</span>`
-      : '';
+      ? `<span style="color:#f97316;font-weight:800;"> · 🔩 SEIZED LUGS DETECTED</span>`
+      : (j.isRusted ? '<span style="color:#f97316;font-weight:800;"> · POSSIBLE RUST</span>' : '');
     const lockBadge = j.hasWheelLock
-      ? `<span style="color:#f59e0b;font-weight:800;"> · 🔑 LOCK KEY</span>`
+      ? '<span style="color:#f59e0b;font-weight:800;"> · 🔑 WHEEL LOCK</span>'
       : '';
+    const prepText = !stockReady
+      ? (needsTire ? (heavy ? 'Restock a Heavy-Duty Tire before accepting' : 'Restock a Standard Tire before accepting') : 'Restock Plug Kits before accepting')
+      : (j.isRusted && radarLvl < 2 ? 'Allow extra time: lug corrosion may be present' : j.hasWheelLock ? 'Bring the wheel-lock key for this call' : 'Cargo check passed · ready to roll');
     return `
-      <div class="job-card ${j.vip ? 'vip' : ''}">
+      <div class="job-card dispatch-intel-card ${j.vip ? 'vip' : ''}">
         <div class="job-top">
           <div>
             <span class="badge">${j.vip ? '⚡ VIP COMMERCIAL SNIPE' : j.veh.label}</span>
             <span class="badge" style="margin-left:4px;">${w.label}</span>
             <h3 style="font-size:14px;margin-top:5px;">${j.title}</h3>
           </div>
-          <div class="job-pay">$${j.pay}${state.surgeJobs > 0 ? ' (2x)' : ''}</div>
+          <div class="job-pay">$ ${j.pay}${state.surgeJobs > 0 ? ' · 2X' : ''}</div>
         </div>
-        <div class="dispatch-vehicle-art">${renderVehicleSVG(j.veh)}<span class="vehicle-class-tag">${j.veh.heavy ? 'HEAVY-DUTY FLEET' : 'ROAD SERVICE'}</span></div>
+        <div class="dispatch-vehicle-art">${renderVehicleSVG(j.veh)}<span class="vehicle-class-tag">${heavy ? 'HEAVY-DUTY FLEET' : 'ROAD SERVICE'}</span></div>
+        <div class="dispatch-intel-strip">
+          <span style="color:${riskColor};">● ${riskLabel}</span>
+          <span>NET EST. <strong>$${projected}</strong></span>
+          <span>⏱ ${j.timeLimit}s SLA</span>
+        </div>
         <div class="job-meta">
-          <span>${j.veh.heavy ? '🛞 HD Tire' : '🛞 Std Tire'} · ${j.veh.targetPsi} PSI${hazardBadge}${lockBadge}</span>
-          <span>⭐ +${j.baseRep || 30} REP · ⏱️ SLA: ${j.timeLimit}s</span>
+          <span>🛞 ${heavy ? 'HD Tire' : 'Std Tire'} · ${j.veh.targetPsi} PSI${hazardBadge}${lockBadge}</span>
+          <span>⭐ +${j.baseRep || 30} REP</span>
         </div>
-        <button class="primary-btn" onclick="acceptJob('${j.id}')">
-          ${j.vip ? `SNIPE DISPATCH (${j.snipeCost} ⚡)` : 'ACCEPT & ROLL RIG'}
+        <div class="dispatch-prep-note ${stockReady ? 'ready' : 'warning'}">${stockReady ? '✓' : '⚠'} ${prepText}</div>
+        <button class="primary-btn" ${!stockReady ? 'disabled' : ''} onclick="acceptJob('${j.id}')">
+          ${!stockReady ? 'RESTOCK REQUIRED' : j.vip ? `SNIPE DISPATCH (${j.snipeCost} ⚡)` : 'ACCEPT & ROLL RIG'}
         </button>
       </div>
     `;
