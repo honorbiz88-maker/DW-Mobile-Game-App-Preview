@@ -141,7 +141,7 @@ test('a deliberate cloud restore survives reload without reopening the same conf
     'An explicit cloud restore marker must be honored before the ordinary owner mismatch guard');
   assert.match(reconcile, /localStorage\.setItem\(LOCAL_KEY, cloudPayload\)/);
   assert.doesNotMatch(reconcile, /queueSave\(local\.payload\)/);
-  assert.match(reconcile, /JSON\.stringify\(local\.payload\) === JSON\.stringify\(cloud\.payload\)/);
+  assert.match(reconcile, /JSON\.stringify\(local\.payload\) === cloudPayload/);
   assert.match(reconcile, /reconcilingUids\.has\(user\.uid\)/);
   assert.ok(reconcile.indexOf('RESTORE_MARKER_KEY') < reconcile.indexOf('if (!local)'));
   assert.match(reconcile, /Cloud career restored and connected/);
