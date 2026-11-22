@@ -2393,12 +2393,12 @@ function tapLug(id) {
 
 function lowerJackAndFinish() {
   const job = state.activeJob;
-  if (!job || job.step !== 5 || job.torqueIdx < 5) return;
+  if (!job || job.step !== 5 || job.torqueIdx < 5 || job.jackLowered) return;
   job.jackLowered = true;
   SoundFX.jack();
   renderBay();
   setTimeout(() => {
-    completeJob();
+    if (state.activeJob === job) completeJob();
   }, 350);
 }
 
@@ -2505,15 +2505,16 @@ function lockPsi() {
 }
 
 function completeJob() {
-  stopHoldPsi();
   const job = state.activeJob;
+  if (!job) return;
+  stopHoldPsi();
+  state.activeJob = null;
   SoundFX.success();
 
   if (job.isTutorial) {
     const firstTime = !state.tutorialDone;
     state.tutorialDone = true;
     if (firstTime) state.tokens += 12;
-    state.activeJob = null;
     saveState();
     updateHUD();
     openModal(`
@@ -2585,8 +2586,6 @@ function completeJob() {
   const jobRating = isCleanJob ? 5.0 : Math.max(3.5, 5.0 - Math.min(1.5, job.penalties * 0.01));
   state.ratings.push(jobRating);
   if (state.ratings.length > 15) state.ratings.shift();
-  state.activeJob = null;
-
   if (state.jobs.length < 2) refreshJobs();
   saveState();
   updateHUD();
