@@ -70,6 +70,21 @@ test('cloud save queue is bound to the account that created it', () => {
   assert.match(cloudSource, /pendingPayload = \{ uid: queuedUid, payload:/);
 });
 
+test('cloud writes and conflict choices remain bound to the originating account', () => {
+  assert.match(cloudSource, /async function writeCloud\(payload, expectedUid = currentUser\?\.uid\)/);
+  assert.match(cloudSource, /currentUser\.uid !== expectedUid/);
+  assert.match(cloudSource, /doc\(db, "users", expectedUid, "saves", "current"\)/);
+  assert.match(cloudSource, /pendingConflict = \{ localRaw, cloudData, uid: currentUser\?\.uid \|\| null \}/);
+  assert.match(cloudSource, /pending\.uid !== currentUser\.uid/);
+  assert.match(cloudSource, /await writeCloud\(JSON\.parse\(pending\.localRaw\), pending\.uid\);[\s\S]*?currentUser\.uid !== pending\.uid/);
+  assert.match(cloudSource, /pendingConflict = null;[\s\S]*?busy = false;/);
+});
+
+test('malformed local save values are treated as invalid and never auto-restored over cloud', () => {
+  assert.match(cloudSource, /parsed && typeof parsed === "object" && !Array\.isArray\(parsed\) \? \{ raw, payload: parsed \} : \{ raw, invalid: true \}/);
+  assert.match(cloudSource, /if \(local\?\.invalid\) return;/);
+});
+
 test('cloud reconciliation rejects stale account responses before touching local save', () => {
   const getDocIndex = cloudSource.indexOf('const snap = await getDoc(ref);');
   const guardIndex = cloudSource.indexOf('if (!currentUser || currentUser.uid !== user.uid) return;', getDocIndex);
