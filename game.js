@@ -981,14 +981,9 @@ function renderDispatchScanControl() {
       <div style="font-size:11px;color:var(--amber);text-align:center;font-weight:700;">
         📡 Radar Recharging · ${cdText}
       </div>
-      <div class="ctrl-grid-2">
-        <button class="secondary-btn" onclick="triggerDispatchScan('ad')" style="font-size:11px;padding:9px 4px;">
-          📺 WATCH AD (+1 SCAN)
-        </button>
-        <button class="primary-btn" onclick="triggerDispatchScan('token')" style="font-size:11px;padding:9px 4px;">
-          ⚡ INSTANT SCAN (2 ⚡)
-        </button>
-      </div>`;
+      <button class="primary-btn" onclick="triggerDispatchScan('token')" style="font-size:11px;padding:9px 4px;">
+        ⚡ INSTANT SCAN (2 ⚡ TOKENS)
+      </button>`;
   }
 }
 
@@ -1011,7 +1006,7 @@ function triggerDispatchScan(mode) {
   }
   if (mode === 'token') {
     if (state.tokens < 2) {
-      showAlert('INSUFFICIENT TOKENS', 'Instant Radar Scan requires 2 ⚡ Dispatch Tokens, or watch a sponsor ad.');
+      showAlert('INSUFFICIENT TOKENS', 'Instant Radar Scan requires 2 ⚡ Dispatch Tokens.');
       goPage('shop');
       return;
     }
@@ -1021,9 +1016,6 @@ function triggerDispatchScan(mode) {
     saveState();
     updateHUD();
     return;
-  }
-  if (mode === 'ad') {
-    watchRewardedAd('scan');
   }
 }
 
@@ -1045,6 +1037,23 @@ function triggerSurgeAction() {
     </button>
     <button class="ghost-btn" onclick="closeModal()">CLOSE</button>
   `);
+}
+
+function activateFreeSurge() {
+  syncSurgeRecharge();
+  if (state.surgeCharges <= 0) {
+    showToast('No free Surge charges available.');
+    return;
+  }
+  if (state.surgeCharges === MAX_SURGE_CHARGES) {
+    state.lastSurgeRechargeAt = Date.now();
+  }
+  state.surgeCharges -= 1;
+  state.surgeJobs += 1;
+  SoundFX.success();
+  saveState();
+  updateHUD();
+  renderJobs();
 }
 
 function activateInstantSurgeToken() {
