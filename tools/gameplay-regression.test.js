@@ -579,3 +579,69 @@ test('vehicle cannot be released until repair and all five torque steps are comp
   lower();
   assert.equal(job.jackLowered,true);
 });
+
+
+test('complete clean roadside repair traverses every bay stage in order without penalties', () => {
+  const job={
+    step:1,conesSet:false,chocked:false,liftPct:0,weather:{id:'clear'},floodlightsOn:true,
+    hasWheelLock:false,lockKeyApplied:true,lugHealth:{1:1,2:1,3:1,4:1,5:1},lugsRemoved:[],
+    scanned:false,fixed:false,psi:12,torqueIdx:0,jackLowered:false,
+    dmg:{action:'plug',title:'Center tread nail'},veh:{axleWeight:1,targetPsi:35,heavy:false},
+    penalties:0,repPenalties:0,penaltyLog:[]
+  };
+  const state={activeJob:job,tools:{jack:{level:1},impact:{level:1},comp:{level:1}},plugs:1};
+  const calls=[];
+  const deps={
+    state,WEATHER_CONDITIONS:[{id:'clear'}],STAR_ORDER:[1,3,5,2,4],
+    addBayPenalty:(j,c,r,p)=>{j.penalties+=c;j.repPenalties+=p;j.penaltyLog.push({reason:r});},
+    showAlert:(t)=>calls.push(t),showBayActionHint:()=>{},renderBay:()=>{},dismissAlert:()=>{},
+    updateHUD:()=>{},SoundFX:{chock:()=>{},jack:()=>{},impact:()=>{},scan:()=>{},air:()=>{},torqueClick:()=>{},success:()=>{}},
+    triggerLugSpin:()=>{},stopHoldPsi:()=>{},updateLivePsiMeter:()=>{},
+    setTimeout:(fn)=>fn(),completeJob:()=>{calls.push('completed');state.activeJob=null;}
+  };
+  gameFunction('setCones',deps)();
+  assert.equal(job.conesSet,true);
+  gameFunction('setChocks',deps)();
+  assert.equal(job.chocked,true);
+  const pump=gameFunction('pumpJack',deps);
+  while(job.step===1) pump();
+  assert.equal(job.step,2);
+  for(const id of [1,2,3,4,5]) gameFunction('tapLug',deps)(id);
+  assert.equal(job.step,3);
+  gameFunction('runScan',deps)();
+  assert.equal(job.scanned,true);
+  gameFunction('performRepair',deps)('plug');
+  assert.equal(job.fixed,true);
+  assert.equal(state.plugs,0);
+  assert.equal(job.step,4);
+  gameFunction('applyPsiTick',deps)(23);
+  assert.equal(job.psi,35);
+  gameFunction('lockPsi',deps)();
+  assert.equal(job.step,5);
+  for(const id of [1,3,5,2,4]) gameFunction('tapLug',deps)(id);
+  assert.equal(job.torqueIdx,5);
+  gameFunction('lowerJackAndFinish',deps)();
+  assert.equal(job.jackLowered,true);
+  assert.equal(state.activeJob,null);
+  assert.ok(calls.includes('completed'));
+  assert.equal(job.penalties,0);
+  assert.equal(job.repPenalties,0);
+});
+
+test('wheel-lock adapter is stage-gated, required only for locked wheels, and repeat-safe', () => {
+  const job={step:1,hasWheelLock:true,lockKeyApplied:false};
+  const state={activeJob:job};
+  const alerts=[];
+  let clicks=0;
+  const deps={state,showBayActionHint:()=>{},showAlert:(t)=>alerts.push(t),dismissAlert:()=>{},renderBay:()=>{},SoundFX:{torqueClick:()=>{clicks++;}}};
+  const apply=gameFunction('applyWheelLockKey',deps);
+  apply();
+  assert.equal(job.lockKeyApplied,false);
+  job.step=2;
+  apply();
+  assert.equal(job.lockKeyApplied,true);
+  apply();
+  assert.equal(job.lockKeyApplied,true);
+  assert.equal(clicks,1);
+  assert.ok(alerts.some(x=>/KEY ALREADY SEATED/.test(x)));
+});
