@@ -265,7 +265,7 @@ test('live job completion calculates payout, REP, milestone Gear, contract progr
     isTutorial: false, pay: 100, surgeMultiplier: 1.5,
     timeLeft: 60, timeLimit: 100, penalties: 10, repPenalties: 6,
     baseRep: 40, dmg: { action: 'plug' }, veh: { heavy: false },
-    fixed: true, title: 'Regression Roadside Call', penaltyLog: []
+    fixed: true, step: 5, torqueIdx: 5, jackLowered: true, title: 'Regression Roadside Call', penaltyLog: []
   };
   const state = {
     activeJob: job, cash: 500, rep: 20, jobsCompleted: 9, parts: 0,
