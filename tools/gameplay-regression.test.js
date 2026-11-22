@@ -7,6 +7,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'game.js'), 'utf8');
+const cloudSource = fs.readFileSync(path.join(__dirname, '..', 'firebase-cloud.js'), 'utf8');
 
 // Compile the real production function body from game.js with controlled dependencies.
 // This exercises game logic without booting or rewriting the browser application.
@@ -56,6 +57,28 @@ function gameFunction(name, dependencies = {}) {
   const values = Object.values(dependencies);
   return new Function(...names, `return (${extractFunction(name)});`)(...values);
 }
+
+test('cloud save queue is bound to the account that created it', () => {
+  const match = cloudSource.match(/function pendingBelongsToUser\(pending, user\) \{[\s\S]*?\n\}/);
+  assert.ok(match, 'Missing account-scoped pending-save guard');
+  const belongs = new Function(`return (${match[0]});`)();
+  assert.equal(belongs({ uid: 'account-A', payload: { cash: 10 } }, { uid: 'account-A' }), true);
+  assert.equal(belongs({ uid: 'account-A', payload: { cash: 10 } }, { uid: 'account-B' }), false);
+  assert.equal(belongs({ uid: 'account-A' }, null), false);
+  assert.match(cloudSource, /const queuedUid = currentUser\.uid;/);
+  assert.match(cloudSource, /currentUser\.uid !== queuedUid/);
+  assert.match(cloudSource, /pendingPayload = \{ uid: queuedUid, payload:/);
+});
+
+test('cloud reconciliation rejects stale account responses before touching local save', () => {
+  const getDocIndex = cloudSource.indexOf('const snap = await getDoc(ref);');
+  const guardIndex = cloudSource.indexOf('if (!currentUser || currentUser.uid !== user.uid) return;', getDocIndex);
+  const localReadIndex = cloudSource.indexOf('const local = localSnapshot();', getDocIndex);
+  assert.ok(getDocIndex >= 0 && guardIndex > getDocIndex && localReadIndex > guardIndex,
+    'Account identity must be rechecked after Firestore returns and before reading or changing local save');
+  assert.match(cloudSource, /if \(currentUser\?\.uid === user\.uid\) busy = false;/);
+  assert.match(cloudSource, /if \(previousUid !== nextUid\) \{[\s\S]*?clearTimeout\(syncTimer\);[\s\S]*?pendingPayload = null;[\s\S]*?busy = false;/);
+});
 
 test('stock pricing scales with rig and territory multipliers', () => {
   const pricing = gameFunction('getStockPricing', {
