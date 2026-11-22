@@ -1662,6 +1662,49 @@ test('cloud restore overrides a boot-normalized device save and keeps it only as
   assert.equal(second.calls.modal, '', 'The post-restore reload must not reopen the conflict');
 });
 
+test('a returning player with a matching account owner automatically restores the cloud career without a conflict prompt', async () => {
+  const deviceCareer = { cash: 900, jobsCompleted: 25, parts: 2 };
+  const cloudCareer = { cash: 640, jobsCompleted: 12, parts: 3 };
+  const h = cloudModuleHarness({
+    local: {
+      delwin_v4_save: JSON.stringify(deviceCareer),
+      delwin_cloud_owner_uid: 'account-C'
+    },
+    cloud: {
+      'users/account-C/saves/current': {
+        schemaVersion: 1, payload: cloudCareer, updatedAt: {}, deviceId: 'account-C-device'
+      }
+    },
+    user: { uid: 'account-C', email: 'c@example.com' }
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.calls.modal, '', 'A returning player must not be asked to resolve the same device/cloud pair again');
+  assert.equal(h.store.get('delwin_cloud_owner_uid'), 'account-C');
+  assert.deepEqual(JSON.parse(h.store.get('delwin_v4_save')), cloudCareer,
+    'The account cloud career is the source of truth on launch');
+  const backupKey = Array.from(h.store.keys()).find(key => key.startsWith('delwin_backup_before-cloud-refresh_'));
+  assert.ok(backupKey, 'Preserve the divergent device copy before restoring cloud');
+  assert.deepEqual(JSON.parse(h.store.get(backupKey)), deviceCareer);
+  assert.equal(h.calls.reloads, 1, 'Reload once with the authoritative cloud career');
+  const second = cloudModuleHarness({
+    local: Object.fromEntries(h.store.entries()),
+    cloud: Object.fromEntries(h.cloudDocs.entries()),
+    user: { uid: 'account-C', email: 'c@example.com' }
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(second.calls.modal, '', 'The next launch must not reopen a save-choice dialog');
+  assert.equal(second.calls.reloads, 0, 'A matching local cache should load without another reload');
+  assert.deepEqual(JSON.parse(second.store.get('delwin_v4_save')), cloudCareer);
+});
+
+test('mobile repair layout brings action controls closer to the first phone viewport', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'style.css'), 'utf8');
+  assert.match(css, /@media\s*\(max-width:\s*480px\)[\s\S]*?#page-bay\s*\{[^}]*padding:\s*9px/);
+  assert.match(css, /@media\s*\(max-width:\s*480px\)[\s\S]*?\.bay-stage\s*\{[^}]*height:\s*190px/);
+  assert.match(css, /@media\s*\(max-width:\s*480px\)[\s\S]*?#bay-controls\s*\{[^}]*padding:\s*10px/);
+  assert.match(css, /@media\s*\(max-width:\s*360px\)[\s\S]*?\.bay-stage\s*\{[^}]*height:\s*180px/);
+});
+
 test('a fresh device restores a valid cloud career and records its account owner', async () => {
   const cloudCareer = { cash: 640, jobsCompleted: 12, parts: 3 };
   const cloudDoc = { schemaVersion: 1, payload: cloudCareer, updatedAt: { seconds: 10 }, deviceId: 'first-device' };
