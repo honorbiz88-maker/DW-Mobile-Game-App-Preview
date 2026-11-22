@@ -2431,7 +2431,7 @@ function performRepair(choice) {
 
   if (choice === 'plug') {
     if (!job.isTutorial && state.plugs <= 0) {
-      showAlert('OUT OF PLUGS', 'Restock vulcanized tire plugs from Dispatch or watch a Supply Drop Ad in the Shop.');
+      showAlert('OUT OF PLUGS', 'Restock plug kits using the Dispatch stock controls, then return to this repair.');
       return;
     }
     if (!job.isTutorial) state.plugs--;
@@ -2439,13 +2439,13 @@ function performRepair(choice) {
   } else {
     if (job.veh.heavy) {
       if (!job.isTutorial && state.hdTires <= 0) {
-        showAlert('OUT OF HEAVY-DUTY TIRES', 'Commercial trucks require Heavy-Duty Tires! Use Drone Drop below or restock HD Tires.');
+        showAlert('OUT OF HEAVY-DUTY TIRES', 'Commercial trucks require a Heavy-Duty Tire. Use the Dispatch stock controls or the token-priced emergency drone drop below.');
         return;
       }
       if (!job.isTutorial) state.hdTires--;
     } else {
       if (!job.isTutorial && state.stdTires <= 0) {
-        showAlert('OUT OF STANDARD TIRES', 'Use Drone Tire Drop below or restock Standard Tires on Dispatch.');
+        showAlert('OUT OF STANDARD TIRES', 'Restock a Standard Tire using the Dispatch stock controls, or use the token-priced emergency drone drop below.');
         return;
       }
       if (!job.isTutorial) state.stdTires--;
