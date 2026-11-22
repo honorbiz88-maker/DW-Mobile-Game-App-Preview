@@ -131,6 +131,7 @@ test('a deliberate cloud restore survives reload without reopening the same conf
   const restore = cloudSource.slice(restoreStart, restoreEnd);
   assert.match(restore, /RESTORE_MARKER_KEY/);
   assert.match(restore, /revision: cloudRevision/);
+  assert.match(restore, /cloudPayload: pending\.cloudData\.payload/);
   const reconcileStart = cloudSource.indexOf('async function reconcile(user)');
   const reconcileEnd = cloudSource.indexOf('async function keepLocal()', reconcileStart);
   const reconcile = cloudSource.slice(reconcileStart, reconcileEnd);
@@ -1560,6 +1561,44 @@ test('a different account cannot silently upload the device career and cloud res
   assert.ok(localBackupKey, 'The replaced local career must be backed up before cloud restore');
   assert.equal(h.store.get(localBackupKey), JSON.stringify(localCareer));
   assert.equal(h.calls.reloads, 1);
+});
+
+
+test('cloud restore marker survives reload without relying on Firestore timestamp metadata', async () => {
+  const localCareer = { cash: 900, jobsCompleted: 25 };
+  const cloudCareer = { cash: 120, jobsCompleted: 4 };
+  const cloudDoc = {
+    schemaVersion: 1,
+    payload: cloudCareer,
+    // Simulate a valid legacy cloud save whose timestamp is unavailable.
+    updatedAt: {},
+    deviceId: 'other-device'
+  };
+  const first = cloudModuleHarness({
+    local: { delwin_v4_save: JSON.stringify(localCareer), delwin_cloud_owner_uid: 'account-A' },
+    cloud: { 'users/account-B/saves/current': cloudDoc },
+    user: { uid: 'account-B', email: 'b@example.com' }
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.match(first.calls.modal, /SAVE CONFLICT/);
+  first.context.window.DelWinCloud.keepCloud();
+  assert.deepEqual(JSON.parse(first.store.get('delwin_v4_save')), cloudCareer);
+  assert.equal(first.store.get('delwin_cloud_owner_uid'), 'account-B');
+  const marker = JSON.parse(first.store.get('delwin_cloud_restore_pending'));
+  assert.equal(marker.uid, 'account-B');
+  assert.deepEqual(JSON.parse(JSON.stringify(marker.cloudPayload)), cloudCareer);
+
+  // A fresh page load gets the same browser storage and cloud document.
+  const second = cloudModuleHarness({
+    local: Object.fromEntries(first.store.entries()),
+    cloud: Object.fromEntries(first.cloudDocs.entries()),
+    user: { uid: 'account-B', email: 'b@example.com' }
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(second.calls.modal, '', 'The deliberate restore must not reopen a conflict after reload');
+  assert.equal(second.store.has('delwin_cloud_restore_pending'), false);
+  assert.match(second.elements.get('cloud-account-status').textContent, /restored and connected/i);
+  assert.deepEqual(JSON.parse(second.store.get('delwin_v4_save')), cloudCareer);
 });
 
 test('a fresh device restores a valid cloud career and records its account owner', async () => {
