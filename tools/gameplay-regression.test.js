@@ -136,7 +136,9 @@ test('a deliberate cloud restore survives reload without reopening the same conf
   const reconcileEnd = cloudSource.indexOf('async function keepLocal()', reconcileStart);
   const reconcile = cloudSource.slice(reconcileStart, reconcileEnd);
   assert.match(reconcile, /restoreMarker\?\.uid === user\.uid/);
-  assert.match(reconcile, /local\?\.ownerUid === user\.uid/);
+  assert.match(reconcile, /localStorage\.setItem\(OWNER_KEY, user\.uid\)/);
+  assert.ok(reconcile.indexOf('restoreMarker?.uid === user.uid') < reconcile.indexOf('if (local?.ownerUid && local.ownerUid !== user.uid)'),
+    'An explicit cloud restore marker must be honored before the ordinary owner mismatch guard');
   assert.match(reconcile, /queueSave\(local\.payload\)/);
   assert.match(reconcile, /JSON\.stringify\(local\.payload\) === JSON\.stringify\(cloud\.payload\)/);
   assert.match(reconcile, /reconcilingUids\.has\(user\.uid\)/);
@@ -1607,7 +1609,7 @@ test('cloud restore marker survives boot normalization before cloud sync', async
   const h = cloudModuleHarness({
     local: {
       delwin_v4_save: JSON.stringify(normalizedLocalCareer),
-      delwin_cloud_owner_uid: 'account-B',
+      delwin_cloud_owner_uid: 'account-A',
       delwin_cloud_restore_pending: JSON.stringify(marker)
     },
     cloud: {
@@ -1618,7 +1620,8 @@ test('cloud restore marker survives boot normalization before cloud sync', async
     user: { uid: 'account-B', email: 'b@example.com' }
   });
   await new Promise(resolve => setImmediate(resolve));
-  assert.equal(h.calls.modal, '', 'A pending explicit restore must suppress the repeated conflict');
+  assert.equal(h.calls.modal, '', 'A pending explicit restore must suppress the repeated conflict even if boot left stale owner metadata');
+  assert.equal(h.store.get('delwin_cloud_owner_uid'), 'account-B', 'The explicit restore must reassert the selected account owner');
   assert.equal(h.store.has('delwin_cloud_restore_pending'), true,
     'Keep the marker until the normalized local career has synced');
   assert.equal(h.timers.size > 0, true, 'Queue the normalized local career for cloud synchronization');
