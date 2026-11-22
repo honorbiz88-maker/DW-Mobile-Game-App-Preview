@@ -80,6 +80,28 @@ test('cloud writes and conflict choices remain bound to the originating account'
   assert.match(cloudSource, /pendingConflict = null;[\s\S]*?busy = false;/);
 });
 
+test('account-mismatched save conflict does not offer an unsafe keep-local upload', () => {
+  const start = cloudSource.indexOf('function showConflict(');
+  const end = cloudSource.indexOf('async function writeCloud', start);
+  const modal = cloudSource.slice(start, end);
+  assert.match(modal, /localOwnerUid !== currentUser\.uid/);
+  assert.match(modal, /This device career is linked to a different account/);
+  assert.match(modal, /KEEP THIS DEVICE/);
+  assert.match(modal, /RESTORE CLOUD CAREER/);
+  assert.ok(modal.indexOf('localOwnerUid !== currentUser.uid') < modal.indexOf('KEEP THIS DEVICE'),
+    'Keep-local action must be conditional on matching account ownership');
+});
+
+test('restoring a cloud conflict backs up the device career before replacing it', () => {
+  const start = cloudSource.indexOf('function keepCloud()');
+  const end = cloudSource.indexOf('function pendingBelongsToUser', start);
+  const restore = cloudSource.slice(start, end);
+  assert.ok(restore.indexOf('backupLocal(pending.localRaw)') >= 0);
+  assert.ok(restore.indexOf('backupLocal(pending.localRaw)') < restore.indexOf('localStorage.setItem(LOCAL_KEY'));
+  assert.ok(restore.indexOf('localStorage.setItem(LOCAL_KEY') < restore.indexOf('localStorage.setItem(OWNER_KEY'));
+  assert.match(restore, /pending\.uid !== currentUser\.uid/);
+});
+
 test('local career owned by another account is never reconciled into the signed-in account', () => {
   const ownerGuard = cloudSource.indexOf('if (local?.ownerUid && local.ownerUid !== user.uid)');
   const cloudBranch = cloudSource.indexOf('if (snap.exists())', ownerGuard);
