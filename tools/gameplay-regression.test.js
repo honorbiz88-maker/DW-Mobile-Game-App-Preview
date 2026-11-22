@@ -1603,8 +1603,8 @@ test('cloud restore marker survives reload without relying on Firestore timestam
 });
 
 test('gameplay save routine defers local writes while an accepted cloud restore is pending', () => {
-  const start = gameSource.indexOf('function saveState()');
-  const end = gameSource.indexOf('function syncPoolRecharge', start);
+  const start = source.indexOf('function saveState()');
+  const end = source.indexOf('function syncPoolRecharge', start);
   const save = gameSource.slice(start, end);
   assert.match(save, /DelWinCloud\?\.isRestorePending\?\.\(\)\) return/);
   assert.ok(save.indexOf('isRestorePending') < save.indexOf("localStorage.setItem('delwin_v4_save'"),
@@ -1635,7 +1635,7 @@ test('cloud restore overrides a boot-normalized device save and keeps it only as
     'The cloud career must replace any startup-normalized device payload');
   assert.equal(h.store.has('delwin_cloud_restore_pending'), true,
     'Keep the marker across reload so boot cannot rewrite the restored payload before auth reconciliation');
-  assert.equal(h.timers.size, false, 'The device payload must never be queued over the cloud career');
+  assert.equal(h.timers.size, 0, 'The device payload must never be queued over the cloud career');
   const backupKey = Array.from(h.store.keys()).find(key => key.startsWith('delwin_backup_restore-reconciliation_'));
   assert.ok(backupKey, 'Preserve the divergent startup/device save as a backup');
   assert.deepEqual(JSON.parse(h.store.get(backupKey)), normalizedLocalCareer);
