@@ -1466,16 +1466,16 @@ function renderJobs() {
         <div class="dispatch-location-line">📍 ${j.locationLabel || 'Service area'} · ${j.callType || 'ROAD SERVICE'}</div>
         <div class="dispatch-intel-strip">
           <span style="color:${riskColor};">● ${riskLabel}</span>
-          <span>NET EST. AFTER SUPPLIES <strong>${Math.round(projected)}</strong></span>
+          <span>EST. CASH AFTER COST RESERVE <strong>${Math.round(projected)}</strong></span>
           <span>⏱ ${j.timeLimit}s SLA</span>
         </div>
         <div class="dispatch-risk-details" style="font-size:10px;color:var(--muted);margin:3px 0 6px;" aria-label="Dispatch risk factors">Risk factors: ${riskDetailText}</div>
         <div class="dispatch-net-breakdown" style="display:flex;flex-wrap:wrap;gap:6px 12px;padding:7px 9px;margin:5px 0;background:rgba(15,23,42,.42);border-radius:7px;font-size:10px;color:var(--muted);">
-          <span>Gross if accepted now: <strong style="color:var(--text);">${Math.round(grossEstimate)}</strong></span>
+          <span>Gross payout if accepted now: <strong style="color:var(--text);">${Math.round(grossEstimate)}</strong></span>
           <span>Supply reserve (not deducted from payout): <strong style="color:var(--text);">−${Math.round(supplyCost)}</strong></span>
-          <span>Operating overhead (deducted): <strong style="color:var(--text);">−${Math.round(overhead)}</strong></span>
+          <span>Service payout after overhead: <strong style="color:var(--text);">${Math.max(0, Math.round(grossEstimate - overhead))}</strong></span>
           <span>Fast-finish bonus if eligible: <strong style="color:var(--green);">+${fastBonusEstimate}</strong></span>
-          <span style="width:100%;font-size:9px;">Estimated cash after overhead and supply reserve: ${Math.round(projected)}. Supplies are paid separately when restocked. Fast bonus is conditional; penalties may reduce payout. Surge applies only to the next accepted call.</span>
+          <span style="width:100%;font-size:9px;">Cash estimate after overhead and reserving supply replacement: ${Math.round(projected)}. Supplies are paid separately when restocked; the reserve is not a payout deduction. Fast bonus is conditional and penalties may reduce the invoice. Surge applies only to the next accepted call.</span>
         </div>
         <div class="job-meta">
           <span>🛞 ${heavy ? 'HD Tire' : 'Std Tire'} · ${j.veh.targetPsi} PSI${hazardBadge}${lockBadge}</span>
