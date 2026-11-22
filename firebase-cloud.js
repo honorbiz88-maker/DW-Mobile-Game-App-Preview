@@ -29,6 +29,7 @@ let syncTimer = null;
 let pendingPayload = null;
 let busy = false;
 let writing = false;
+const reconcilingUids = new Set();
 
 function status(message, error = false) {
   const el = document.getElementById("cloud-account-status");
@@ -178,6 +179,8 @@ async function writeCloud(payload, expectedUid = currentUser?.uid) {
   await setDoc(ref, saveEnvelope(payload));
 }
 async function reconcile(user) {
+  if (reconcilingUids.has(user.uid)) return;
+  reconcilingUids.add(user.uid);
   syncReady = false;
   busy = true;
   status("Checking for an existing cloud career…");
@@ -231,10 +234,22 @@ async function reconcile(user) {
     let restoreMarker = null;
     try { restoreMarker = JSON.parse(localStorage.getItem(RESTORE_MARKER_KEY) || "null"); } catch {}
     const cloudRevision = cloud.updatedAt?.toMillis ? cloud.updatedAt.toMillis() : null;
-    if (restoreMarker?.uid === user.uid && cloudRevision !== null && restoreMarker.revision === cloudRevision && local?.ownerUid === user.uid) {
-      localStorage.removeItem(RESTORE_MARKER_KEY);
+    const markerStillOwnsCloud = restoreMarker?.uid === user.uid
+      && local?.ownerUid === user.uid
+      && cloudRevision !== null
+      && (restoreMarker.revision === cloudRevision || (restoreMarker.deviceId && cloud.deviceId === restoreMarker.deviceId));
+    if (markerStillOwnsCloud) {
       syncReady = true;
-      status("Cloud career restored and connected.");
+      if (JSON.stringify(local.payload) === JSON.stringify(cloud.payload)) {
+        localStorage.removeItem(RESTORE_MARKER_KEY);
+        status("Cloud career restored and connected.");
+      } else {
+        // Keep the explicit restore decision until the boot-normalized local
+        // career has been written back. This prevents a later reopen from
+        // treating the same restored career as a fresh conflict.
+        status("Finishing cloud career restore…");
+        queueSave(local.payload);
+      }
       return;
     }
     if (!local) {
@@ -255,6 +270,7 @@ async function reconcile(user) {
     status(`Cloud check failed: ${error.message}. Your local career remains available.`, true);
   } finally {
     if (currentUser?.uid === user.uid) busy = false;
+    reconcilingUids.delete(user.uid);
   }
 }
 async function keepLocal() {
@@ -286,7 +302,7 @@ function keepCloud() {
     backupLocal(pending.localRaw);
     const cloudRevision = pending.cloudData.updatedAt?.toMillis ? pending.cloudData.updatedAt.toMillis() : null;
     if (cloudRevision !== null) {
-      localStorage.setItem(RESTORE_MARKER_KEY, JSON.stringify({ uid: currentUser.uid, revision: cloudRevision }));
+      localStorage.setItem(RESTORE_MARKER_KEY, JSON.stringify({ uid: currentUser.uid, revision: cloudRevision, deviceId: getDeviceId() }));
     }
     localStorage.setItem(LOCAL_KEY, JSON.stringify(pending.cloudData.payload));
     localStorage.setItem(OWNER_KEY, currentUser.uid);
@@ -315,7 +331,12 @@ async function flushPendingSave(expectedUid) {
   let retryDelay = 1400;
   try {
     await writeCloud(next, expectedUid);
-    if (currentUser?.uid === expectedUid) status("Cloud save synced.");
+    if (currentUser?.uid === expectedUid) {
+      let restoreMarker = null;
+      try { restoreMarker = JSON.parse(localStorage.getItem(RESTORE_MARKER_KEY) || "null"); } catch {}
+      if (restoreMarker?.uid === expectedUid) localStorage.removeItem(RESTORE_MARKER_KEY);
+      status("Cloud save synced.");
+    }
   } catch (error) {
     if (currentUser?.uid === expectedUid && syncReady) {
       // Keep the newest queued state; otherwise retry the failed snapshot.
