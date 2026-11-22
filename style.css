@@ -921,9 +921,17 @@ button, .lug-btn, .hud-pill-compact {
   border:1px solid rgba(84,200,237,.16);
 }
 .badge { letter-spacing:.8px; }
+@media (max-width:480px) {
+  /* Keep the live repair controls closer to the visible phone viewport. */
+  #page-bay { padding: 9px; }
+  .bay-stage { height: 190px; }
+  .step-pills { margin: 6px 0; gap: 3px; }
+  .sp { padding: 5px 1px; font-size: 9px; }
+  #bay-controls { margin-top: 6px; padding: 10px; }
+}
 @media (max-width:360px) {
   .page { padding:9px; }
-  .bay-stage { height:220px; }
+  .bay-stage { height:180px; }
   .stage-chassis img { width:235px;height:82px; }
 }
 @media (prefers-reduced-motion:reduce) {
