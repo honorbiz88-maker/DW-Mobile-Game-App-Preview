@@ -228,6 +228,7 @@ let state = {
     radar: { name: 'Dispatch GPS Radar', level: 1, baseCost: 90, prefix: 'tool-radar', icon: '📡' }
   },
   customerLedger: {},
+  contractsCompleted: 0,
   jobs: [],
   activeJob: null
 };
@@ -262,6 +263,7 @@ function loadState() {
     }
     if (!Array.isArray(state.ratings) || state.ratings.length === 0) state.ratings = [5.0];
     if (!state.customerLedger || typeof state.customerLedger !== 'object' || Array.isArray(state.customerLedger)) state.customerLedger = {};
+    if (!Number.isFinite(state.contractsCompleted)) state.contractsCompleted = 0;
     if (!Array.isArray(state.jobs)) state.jobs = [];
     state.jobs = state.jobs.filter((j) => j && j.veh && typeof j.veh === 'object' && j.dmg && typeof j.dmg === 'object');
     if (state.activeJob && (!state.activeJob.veh || typeof state.activeJob.veh !== 'object' || !state.activeJob.dmg || typeof state.activeJob.dmg !== 'object')) {
@@ -736,12 +738,15 @@ function claimContract() {
   if (!c || c.progress < c.target) return;
   SoundFX.success();
   const zMult = getZone().mult;
-  const cashWon = Math.round(c.rewardCash * zMult);
-  const repWon = Math.round(c.rewardRep * zMult);
+  const contractRank = Math.max(1, (state.contractsCompleted || 0) + 1);
+  const contractBonusRate = Math.min(0.30, Math.floor((contractRank - 1) / 2) * 0.05);
+  const cashWon = Math.round(c.rewardCash * zMult * (1 + contractBonusRate));
+  const repWon = Math.round(c.rewardRep * zMult * (1 + contractBonusRate));
   state.cash += cashWon;
   state.tokens += c.rewardTokens;
   state.parts += c.rewardPart || 0;
   state.rep += repWon;
+  state.contractsCompleted = (state.contractsCompleted || 0) + 1;
   rollNewContract();
   saveState();
   updateHUD();
@@ -754,6 +759,8 @@ function claimContract() {
       <div style="display:flex;justify-content:space-between;"><span>Dispatch Tokens:</span><strong style="color:var(--amber);">+${c.rewardTokens} ⚡</strong></div>
       ${c.rewardPart ? `<div style="display:flex;justify-content:space-between;"><span>Gold Gear:</span><strong style="color:var(--amber);">+${c.rewardPart} ⚙️</strong></div>` : ''}
       <div style="display:flex;justify-content:space-between;"><span>Corridor Reputation:</span><strong style="color:var(--blue);">+${repWon} REP</strong></div>
+      <div style="display:flex;justify-content:space-between;"><span>Contract career rank:</span><strong style="color:var(--amber);">#${contractRank}</strong></div>
+      ${contractBonusRate ? `<div style="color:var(--green);font-size:11px;">Career contract bonus: +${Math.round(contractBonusRate*100)}%</div>` : ''}
     </div>
     <button class="primary-btn" onclick="closeModal()">NEXT CONTRACT ASSIGNED</button>
   `);
@@ -783,6 +790,7 @@ function renderContractBanner() {
         $${Math.round(c.rewardCash * zMult)} + ${c.rewardTokens}⚡${c.rewardPart ? ` + ${c.rewardPart}⚙️` : ''}
       </strong>
     </div>
+    <div class="contract-career-rank"><span>CAREER CONTRACTS COMPLETED</span><strong>${state.contractsCompleted || 0}</strong><em>Next reward bonus: +${Math.min(30,Math.floor(((state.contractsCompleted||0)+1)/2)*5)}%</em></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px;">
       <strong style="font-size:14px;">${c.title}</strong>
       <span style="font-size:12px;font-weight:800;color:${ready ? 'var(--green)' : 'var(--muted)'};">${c.progress}/${c.target}</span>
