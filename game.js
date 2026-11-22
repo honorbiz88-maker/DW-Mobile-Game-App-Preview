@@ -1169,11 +1169,14 @@ function renderContractBanner() {
   const ready = c.progress >= c.target;
   const pct = Math.min(100, Math.round((c.progress / c.target) * 100));
   const zMult = getZone().mult;
+  const nextContractRank = Math.max(1, (state.contractsCompleted || 0) + 1);
+  const nextContractBonus = Math.min(0.30, Math.floor((nextContractRank - 1) / 2) * 0.05);
+  const displayedContractCash = Math.round(c.rewardCash * zMult * (1 + nextContractBonus));
   box.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;">
       <span class="badge">📋 CONTRACT</span>
       <strong style="font-size:12px;color:var(--amber);">
-        $${Math.round(c.rewardCash * zMult)} + ${c.rewardTokens}⚡${c.rewardPart ? ` + ${c.rewardPart}⚙️` : ''}
+        ${displayedContractCash} + ${c.rewardTokens}⚡${c.rewardPart ? ` + ${c.rewardPart}⚙️` : ''}
       </strong>
     </div>
     <div class="contract-career-rank"><span>CAREER CONTRACTS COMPLETED</span><strong>${state.contractsCompleted || 0}</strong><em>Next reward bonus: +${Math.min(30,Math.floor(((state.contractsCompleted||0)+1)/2)*5)}% · Next Gear: ${5-((state.contractsCompleted||0)%5)} contracts</em></div>
@@ -2574,7 +2577,7 @@ function completeJob() {
     if (ct === 'plugs' && job.dmg.action === 'plug') state.contract.progress += 1;
     if (ct === 'swaps' && job.dmg.action === 'swap') state.contract.progress += 1;
     if (ct === 'fast' && isFast) state.contract.progress += 1;
-    if (ct === 'heavy' && job.veh.heavy) state.contract.progress += 1;
+    if (ct === 'heavy' && job.veh.heavy && job.dmg.action === 'swap' && job.fixed) state.contract.progress += 1;
   }
 
   // Ratings should reflect mistake severity without letting one small fee crater the whole career tier.
