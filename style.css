@@ -907,3 +907,22 @@ button, .lug-btn, .hud-pill-compact {
 .rig-upgrade-stat strong{font-size:20px;color:var(--amber);font-variant-numeric:tabular-nums}
 .rig-upgrade-stat small{font-size:10px;color:var(--muted)}
 .rig-upgrade-status{padding:8px 10px;margin:6px 0 8px;border-radius:8px;background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.2);font-size:11px;font-weight:750;color:#bae6fd}
+
+
+/* Repair bay live checklist and quality feedback */
+.repair-progress-panel{padding:11px;margin:0 0 10px;background:linear-gradient(145deg,rgba(8,20,34,.96),rgba(12,27,43,.88));border:1px solid rgba(96,165,250,.24);border-radius:12px}
+.repair-progress-head,.repair-progress-foot{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.repair-progress-head>div{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.repair-progress-head strong{font-size:12px}
+.repair-issue-count{font-size:9px;font-weight:900;letter-spacing:.55px;color:#86efac}
+.repair-issue-count.has-issues{color:#fca5a5}
+.repair-progress-track{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin:10px 0 6px}
+.repair-progress-track span{height:6px;border-radius:99px;background:rgba(148,163,184,.2)}
+.repair-progress-track span.done{background:#34d399}
+.repair-progress-track span.active{background:var(--amber);box-shadow:0 0 10px rgba(245,158,11,.45)}
+.repair-progress-foot{font-size:10px;font-weight:800;color:var(--muted)}
+.repair-progress-foot span:first-child{color:var(--text)}
+.repair-clean-note{font-size:10px;color:#86efac;margin-top:8px}
+.repair-issue-detail{display:flex;flex-direction:column;gap:4px;margin-top:8px;padding-top:7px;border-top:1px solid rgba(248,113,113,.2)}
+.repair-issue-detail div{display:flex;justify-content:space-between;gap:8px;font-size:10px;color:#fca5a5}
+.repair-issue-detail strong{white-space:nowrap}
