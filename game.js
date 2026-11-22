@@ -228,6 +228,7 @@ let state = {
     radar: { name: 'Dispatch GPS Radar', level: 1, baseCost: 90, prefix: 'tool-radar', icon: '📡' }
   },
   customerLedger: {},
+  rigCondition: 100,
   contractsCompleted: 0,
   jobs: [],
   activeJob: null
@@ -263,6 +264,8 @@ function loadState() {
     }
     if (!Array.isArray(state.ratings) || state.ratings.length === 0) state.ratings = [5.0];
     if (!state.customerLedger || typeof state.customerLedger !== 'object' || Array.isArray(state.customerLedger)) state.customerLedger = {};
+    if (!Number.isFinite(state.rigCondition)) state.rigCondition = 100;
+    state.rigCondition = Math.max(0, Math.min(100, state.rigCondition));
     if (!Number.isFinite(state.contractsCompleted)) state.contractsCompleted = 0;
     if (!Array.isArray(state.jobs)) state.jobs = [];
     state.jobs = state.jobs.filter((j) => j && j.veh && typeof j.veh === 'object' && j.dmg && typeof j.dmg === 'object');
@@ -2153,6 +2156,7 @@ function completeJob() {
   state.cash += net + repeatBonus;
   state.customerLedger[customerKey] = priorVisits + 1;
   state.jobsCompleted = (state.jobsCompleted || 0) + 1;
+  state.rigCondition = Math.max(0, (Number(state.rigCondition) || 100) - (job.veh && job.veh.heavy ? 2.5 : 1.5));
   if (isCleanJob) state.streak = (state.streak || 0) + 1;
   else state.streak = 0;
 
@@ -2304,6 +2308,27 @@ function purchaseRigTier(tierNum) {
   `);
 }
 
+function serviceActiveRig() {
+  const condition = Math.max(0, Math.min(100, Number(state.rigCondition) || 100));
+  const missing = Math.ceil(100 - condition);
+  if (missing <= 0) {
+    showAlert('FLEET READY', 'Your active rig is already at full condition.');
+    return;
+  }
+  const cost = missing * 4;
+  if (state.cash < cost) {
+    showAlert('SERVICE FUNDING REQUIRED', `This maintenance visit costs ${cost.toLocaleString()}. Complete more calls to build your service reserve.`);
+    return;
+  }
+  state.cash -= cost;
+  state.rigCondition = 100;
+  saveState();
+  updateHUD();
+  renderGarage();
+  SoundFX.success();
+  showAlert('RIG SERVICE COMPLETE', `Your active rig has been restored to 100% condition for ${cost.toLocaleString()}.`);
+}
+
 function renderGarage() {
   const activeRigTier = getRigTier();
   if (!previewRigTier) previewRigTier = activeRigTier;
@@ -2351,6 +2376,12 @@ function renderGarage() {
       <div class="rig-upgrade-stat"><span>CARGO CAPACITY</span><strong>${rig.capStd + rig.capHd + rig.capPlugs}</strong><small>${cargoDelta > 0 ? '+' : ''}${cargoDelta} total slots vs active</small></div>
     </div>
     <div class="rig-upgrade-status">${rigStatusLine}</div>
+    <div class="fleet-condition-panel">
+      <div class="fleet-condition-head"><span>ACTIVE RIG CONDITION</span><strong>${Math.round(state.rigCondition)}%</strong></div>
+      <div class="fleet-condition-track"><span style="width:${Math.max(0,Math.min(100,state.rigCondition))}%;background:${state.rigCondition < 30 ? '#fb7185' : state.rigCondition < 60 ? '#fbbf24' : '#34d399'}"></span></div>
+      <small>${state.rigCondition >= 80 ? 'Fleet-ready · routine wear only' : state.rigCondition >= 40 ? 'Service recommended · wear is accumulating' : 'Maintenance due · schedule a fleet service'}</small>
+      <button type="button" class="secondary-btn" onclick="serviceActiveRig()" ${state.rigCondition >= 100 ? 'disabled' : ''}>SERVICE ACTIVE RIG · ${Math.ceil((100-state.rigCondition)*4)}</button>
+    </div>
     <div style="font-size:11px;color:var(--amber);font-weight:800;">
       Hub ${currentHub.hubNum} (${currentHub.name}) → Tool Tier ${currentHub.toolTier} (${currentHub.levels}) · Cargo: ${rig.capStd} Std / ${rig.capHd} HD / ${rig.capPlugs} Plugs
     </div>
