@@ -90,6 +90,20 @@ The previous reward structure was too generous. The source code was granting Gol
 
 The new typical-play supply estimate is roughly 15 career Gears + about 55–60 contract milestone Gears across a 2,600-call career (assuming roughly one completed contract every 7–8 calls) + a small number of 20-clean-call streak rewards. That puts ordinary progression near the 75-Gear requirement rather than the previous large surplus. This is a pacing target, not a guarantee: contract completion and clean streak rates vary by player.
 
+### Early Gear-access validation — 2026-11-22
+
+The first Hub 2 unlock has a clear minimum Gear bill:
+
+- Four tool breakthroughs from Level 4 to Level 5 cost 1 Gear each.
+- The Tier 2 rig commission costs 1 additional Gear.
+- **Total first Hub 2 Gear requirement: 5.** The player must also meet the separate tool cash, rig cash, and 1,800 REP gates.
+
+The revised career awards alone provide 1 Gear at call 10 and 2 more at call 30 (3 cumulative), then 2 more at call 60 (5 cumulative). At the current planning assumption of roughly one completed contract every 7–8 calls, the sixth contract is expected around calls 42–48 and awards another Gear. That puts the player at roughly 4 Gears around the sixth contract and 6 by call 60, before any 20-clean-call streak reward. This is enough to cover the five-Gear Hub 2 package by the 60-call milestone if contracts are claimed; cash and REP may still be the actual gates.
+
+This is a pacing calculation, not a deterministic guarantee. Players who delay claiming a completed contract block the next contract from being issued. Players with a slower contract completion rate may reach the five-Gear threshold later. The current evidence does **not** justify increasing early Gear rewards or changing the 20-call streak threshold. Validate the unlock timing in real playtests before making further adjustments.
+
+The streak reward has a strongly skill-dependent expected frequency. Under an idealized independent-call model, the expected wait for 20 consecutive clean calls is about 1,257 calls at a 75% clean rate and about 72 calls at a 90% clean rate. These are mathematical expectations, not measured player behavior; real clean-call outcomes may be correlated and vary with difficulty. This means the streak stream is rare for typical execution but can add a meaningful earned bonus for consistently excellent play.
+
 ### Current conclusions
 
 - The verified full tool-plus-rig cash requirement is **$2,532,730** with the established discounts restored.
