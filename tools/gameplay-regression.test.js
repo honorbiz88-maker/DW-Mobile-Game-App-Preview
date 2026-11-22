@@ -1112,7 +1112,7 @@ test('six hub entry REP gates align with the live HUB_TIERS and ZONES source dat
 });
 
 test('six rig tiers validate the live RIG_TIERS source data and Gear budget', () => {
-  const match = source.match(/const\\s+RIG_TIERS\\s*=\\s*(\\[[\\s\\S]*?\\n\\]);/);
+  const match = source.match(/const\\s+RIG_TIERS\\s*=\\s*(\\[[\\s\\S]*?\\]);/);
   assert.ok(match, 'Could not read RIG_TIERS from game.js');
   const rigs = vm.runInNewContext(match[1]);
   assert.equal(rigs.length, 6);
