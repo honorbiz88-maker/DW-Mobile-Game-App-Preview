@@ -193,6 +193,7 @@ async function keepLocal() {
   try {
     localStorage.setItem(`delwin_cloud_backup_${currentUser.uid}`, JSON.stringify(pending.cloudData));
     await writeCloud(JSON.parse(pending.localRaw), pending.uid);
+    if (!currentUser || currentUser.uid !== pending.uid) return;
     syncReady = true;
     window.DelWinCloud.pendingConflict = null;
     window.closeModal?.();
@@ -300,6 +301,7 @@ onAuthStateChanged(auth, user => {
       clearTimeout(syncTimer);
       syncTimer = null;
       pendingPayload = null;
+      window.DelWinCloud && (window.DelWinCloud.pendingConflict = null);
       busy = false;
     }
     currentUser = user;
