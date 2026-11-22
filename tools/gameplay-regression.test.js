@@ -241,7 +241,7 @@ test('contract career Gear is awarded exactly on every sixth claimed contract', 
   assert.equal(state.cash, 100);
   assert.equal(state.tokens, 2);
   assert.equal(state.rep, 10);
-  assert.match(modal, /CONTRACT CAREER MILESTONE/);
+  assert.match(modal, /Contract career milestone:/);
 });
 
 test('incomplete contracts cannot be claimed or grant resources', () => {
