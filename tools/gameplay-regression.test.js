@@ -1384,3 +1384,26 @@ test('clean streak pays one Gear at 20 while preserving independent career miles
   assert.equal(state.parts,careerGearAt(40)+2);
   assert.equal(state.streak,0);
 });
+
+
+test('guest play remains available and optional Firebase account controls are wired into the page', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  assert.match(html, /Your progress and game economy save automatically in this browser/);
+  assert.match(html, /No account or sign-up is required/);
+  assert.match(html, /id="cloud-account-card"/);
+  for (const id of ['cloud-signed-out', 'cloud-signed-in', 'cloud-email', 'cloud-password', 'cloud-create', 'cloud-signin', 'cloud-reset', 'cloud-signout', 'cloud-account-status', 'cloud-user-email']) {
+    assert.match(html, new RegExp('id="' + id + '"'), 'Missing account UI element: ' + id);
+  }
+  assert.match(html, /<script type="module" src="firebase-cloud\.js"><\/script>/);
+  assert.match(html, /<main id="page-dispatch" class="page active">/,
+    'Dispatch must remain the active initial page without an account gate');
+  assert.match(source, /localStorage\.setItem\('delwin_v4_save', JSON\.stringify\(state\)\)/,
+    'Guest local saving must remain independent of cloud sync');
+});
+
+test('temporary Firebase diagnostics are not exposed in the player account panel', () => {
+  assert.doesNotMatch(cloudSource, /TEMPORARY PREVIEW-ONLY AUTH API KEY DIAGNOSTIC/);
+  assert.doesNotMatch(cloudSource, /RUN AUTH CONNECTION CHECK/);
+  assert.match(cloudSource, /onAuthStateChanged\(auth, user =>/);
+  assert.match(cloudSource, /Sign in to back up your career across devices/);
+});
