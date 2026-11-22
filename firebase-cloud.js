@@ -47,20 +47,20 @@ function accountCard() {
   create?.addEventListener("click", async () => {
     const { email, password } = credentials();
     if (!email || password.length < 6) return status("Enter a valid email and a password of at least 6 characters.", true);
-    await runAuth(() => createUserWithEmailAndPassword(auth, email, password), "Creating account…");
+    await runAuth(() => createUserWithEmailAndPassword(auth, email, password), "Creating account…", null, "Account creation");
   });
   signin?.addEventListener("click", async () => {
     const { email, password } = credentials();
     if (!email || !password) return status("Enter your email and password.", true);
-    await runAuth(() => signInWithEmailAndPassword(auth, email, password), "Signing in…");
+    await runAuth(() => signInWithEmailAndPassword(auth, email, password), "Signing in…", null, "Sign-in");
   });
   reset?.addEventListener("click", async () => {
     const { email } = credentials();
     if (!email) return status("Enter your email first, then choose Forgot password.", true);
-    await runAuth(() => sendPasswordResetEmail(auth, email), "Sending password-reset email…", "Password-reset email sent. Check your inbox.");
+    await runAuth(() => sendPasswordResetEmail(auth, email), "Sending password-reset email…", "Password-reset email sent. Check your inbox.", "Password reset");
   });
   signout?.addEventListener("click", async () => {
-    await runAuth(() => signOut(auth), "Signing out…", "Signed out. This device's local career is still saved.");
+    await runAuth(() => signOut(auth), "Signing out…", "Signed out. This device's local career is still saved.", "Sign-out");
   });
 }
 function credentials() {
@@ -69,7 +69,7 @@ function credentials() {
     password: document.getElementById("cloud-password")?.value || ""
   };
 }
-async function runAuth(action, pendingMessage, successMessage) {
+async function runAuth(action, pendingMessage, successMessage, operation = "Authentication") {
   status(pendingMessage);
   try {
     await action();
@@ -85,7 +85,9 @@ async function runAuth(action, pendingMessage, successMessage) {
       "auth/network-request-failed": "Network error. Check your connection and try again.",
       "auth/operation-not-allowed": "Email and password sign-in is not enabled for this game yet. Please try again later."
     };
-    status(messages[error.code] || error.message || "Account request failed.", true);
+    const detail = messages[error.code] || error.message || "Account request failed.";
+    // Show a safe diagnostic without exposing credentials or request URLs.
+    status(`${operation} failed [${error.code || "unknown"}]: ${detail}`, true);
   }
 }
 function localSnapshot() {
