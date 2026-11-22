@@ -1536,7 +1536,9 @@ test('a different account cannot silently upload the device career and cloud res
   h.context.window.DelWinCloud.keepCloud();
   assert.deepEqual(JSON.parse(h.store.get('delwin_v4_save')), cloudCareer);
   assert.equal(h.store.get('delwin_cloud_owner_uid'), 'account-B');
-  assert.equal(h.store.get('delwin_backup_before-cloud-change_1'), JSON.stringify(localCareer));
+  const localBackupKey = Array.from(h.store.keys()).find(key => key.startsWith('delwin_backup_before-cloud-change_'));
+  assert.ok(localBackupKey, 'The replaced local career must be backed up before cloud restore');
+  assert.equal(h.store.get(localBackupKey), JSON.stringify(localCareer));
   assert.equal(h.calls.reloads, 1);
 });
 
