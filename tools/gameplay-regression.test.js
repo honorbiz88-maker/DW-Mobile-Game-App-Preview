@@ -896,11 +896,15 @@ test('heavy-duty emergency drone drop costs five tokens and supplies only a heav
 });
 
 
-test('territory selection enforces REP unlocks and refuses switching during an active call', () => {
-  const zones=[
-    {id:'z1',unlockRep:0},{id:'z2',unlockRep:500},{id:'z3',unlockRep:1200}
-  ];
-  const state={rep:499,zoneId:'z1',activeJob:null};
+test('territory selection enforces live REP gates across all six hubs and locks during active calls', () => {
+  const readArray = name => {
+    const match = source.match(new RegExp('const\\s+' + name + '\\s*=\\s*(\\[[\\s\\S]*?\\n\\]);'));
+    assert.ok(match, `Could not read ${name} from game.js`);
+    return vm.runInNewContext(match[1]);
+  };
+  const zones = readArray('ZONES');
+  const hubs = readArray('HUB_TIERS');
+  const state={rep:0,zoneId:'z1',activeJob:null};
   const alerts=[];
   let saves=0,refreshes=0,pages=0;
   const select=gameFunction('selectZone',{
@@ -909,20 +913,26 @@ test('territory selection enforces REP unlocks and refuses switching during an a
     SoundFX:{torqueClick:()=>{}},saveState:()=>{saves++;},updateHUD:()=>{},
     refreshJobs:()=>{refreshes++;}
   });
-  select('z2');
-  assert.equal(state.zoneId,'z1');
-  assert.equal(saves,0);
-  state.rep=500;
-  select('z2');
-  assert.equal(state.zoneId,'z2');
-  assert.equal(saves,1);
-  assert.equal(refreshes,1);
+  for (const hub of hubs.slice(1)) {
+    const entryZone = zones.find(zone => zone.hubNum === hub.hubNum);
+    assert.ok(entryZone, `Hub ${hub.hubNum} must have an entry territory`);
+    state.rep = hub.entryRep - 1;
+    const previousZone = state.zoneId;
+    select(entryZone.id);
+    assert.equal(state.zoneId, previousZone, `Hub ${hub.hubNum} must reject one REP below its entry gate`);
+    state.rep = hub.entryRep;
+    select(entryZone.id);
+    assert.equal(state.zoneId, entryZone.id, `Hub ${hub.hubNum} must unlock at its exact REP gate`);
+  }
+  const selectedZone = state.zoneId;
+  const savesBeforeActiveCall = saves;
   state.activeJob={step:2};
-  select('z3');
-  assert.equal(state.zoneId,'z2');
-  assert.equal(saves,1);
+  select('z1');
+  assert.equal(state.zoneId,selectedZone);
+  assert.equal(saves,savesBeforeActiveCall);
   assert.ok(alerts.some(x=>/ACTIVE CALL IN PROGRESS/.test(x)));
-  assert.equal(pages,2); // successful dispatch to zone, then active-call redirect to bay
+  assert.equal(pages,5); // four successful hub selections and active-call redirect
+  assert.equal(refreshes,4);
 });
 
 test('heavy dispatch and heavy contracts remain locked until both Hub 2 and Tier 2 rig are active', () => {
