@@ -450,3 +450,132 @@ test('local save writes the current state and queues the same state for cloud sy
   assert.deepEqual(JSON.parse(localValue), state);
   assert.equal(queued, state);
 });
+
+
+test('repair safety sequence requires cones and chocks before lifting, with distinct repeat-safe penalties', () => {
+  const job = { step: 1, conesSet: false, chocked: false, liftPct: 0, penalties: 0, repPenalties: 0, penaltyLog: [], veh: { axleWeight: 1 } };
+  const state = { activeJob: job, tools: { jack: { level: 1 } } };
+  const alerts = [];
+  const penalties = [];
+  const deps = {
+    state,
+    addBayPenalty: (...args) => { penalties.push(args); const j=args[0]; if (!j.penaltyLog.some(x=>x.reason===args[2])) { j.penalties+=args[1]; j.repPenalties+=args[3]; j.penaltyLog.push({reason:args[2]}); } },
+    showAlert: (title) => alerts.push(title),
+    showBayActionHint: () => {},
+    renderBay: () => {},
+    dismissAlert: () => {},
+    SoundFX: { chock: () => {}, jack: () => {} }
+  };
+  const chocks = gameFunction('setChocks', deps);
+  const pump = gameFunction('pumpJack', deps);
+  const cones = gameFunction('setCones', deps);
+  chocks();
+  assert.equal(job.chocked, false);
+  assert.equal(job.penalties, 10);
+  chocks();
+  assert.equal(job.penalties, 10, 'same safety violation must not stack on repeated taps');
+  pump();
+  assert.equal(job.liftPct, 0);
+  assert.equal(job.penalties, 20, 'lifting without cones is a separate violation');
+  cones();
+  chocks();
+  assert.equal(job.conesSet, true);
+  assert.equal(job.chocked, true);
+  pump();
+  assert.ok(job.liftPct > 0);
+  while (job.step === 1) pump();
+  assert.equal(job.liftPct, 100);
+  assert.equal(job.step, 2);
+  assert.ok(alerts.some(x => /DOT CONE ALERT/.test(x)));
+});
+
+test('wheel lugs reject early work, missing night lights, and unsecured lock lugs', () => {
+  const job = { step: 1, weather: {id:'night'}, floodlightsOn:false, hasWheelLock:true, lockLugId:3, lockKeyApplied:false, lugHealth:{1:1,2:1,3:1,4:1,5:1}, lugsRemoved:[], penalties:0, repPenalties:0, penaltyLog:[] };
+  const state = { activeJob:job, tools:{impact:{level:1}} };
+  const alerts=[];
+  const addBayPenalty=(j,cash,reason,rep)=>{if(!j.penaltyLog.some(x=>x.reason===reason)){j.penalties+=cash;j.repPenalties+=rep;j.penaltyLog.push({reason});}};
+  const tap=gameFunction('tapLug',{state,WEATHER_CONDITIONS:[{id:'clear'}],STAR_ORDER:[1,3,5,2,4],addBayPenalty,showAlert:(t)=>alerts.push(t),showBayActionHint:()=>{},renderBay:()=>{},SoundFX:{error:()=>{},impact:()=>{},torqueClick:()=>{}},triggerLugSpin:()=>{},Math:{random:()=>1}});
+  tap(1);
+  assert.equal(job.penalties,10);
+  job.step=2;
+  tap(1);
+  assert.equal(job.penalties,18);
+  job.floodlightsOn=true;
+  tap(3);
+  assert.equal(job.penalties,28);
+  assert.deepEqual(job.lugsRemoved,[]);
+  assert.ok(alerts.some(x=>/SECURITY WHEEL LOCK/.test(x)));
+});
+
+test('removing all five lugs advances to diagnostic stage and ignores duplicate or invalid lug taps', () => {
+  const job={step:2,weather:{id:'clear'},floodlightsOn:true,hasWheelLock:false,lugHealth:{1:1,2:1,3:1,4:1,5:1},lugsRemoved:[],penalties:0,repPenalties:0,penaltyLog:[]};
+  const state={activeJob:job,tools:{impact:{level:1}}};
+  const tap=gameFunction('tapLug',{state,WEATHER_CONDITIONS:[{id:'clear'}],STAR_ORDER:[1,3,5,2,4],addBayPenalty:()=>{},showAlert:()=>{},showBayActionHint:()=>{},renderBay:()=>{},SoundFX:{error:()=>{},impact:()=>{},torqueClick:()=>{}},triggerLugSpin:()=>{},Math:{random:()=>1}});
+  tap(0); tap(6); tap(1); tap(1);
+  assert.deepEqual(job.lugsRemoved,[1]);
+  for(const id of [2,3,4,5]) tap(id);
+  assert.equal(job.step,3);
+  assert.equal(job.lugsRemoved.length,5);
+  tap(5);
+  assert.equal(job.lugsRemoved.length,5);
+});
+
+test('torque stage enforces star order and only advances after all five lugs', () => {
+  const job={step:5,torqueIdx:0,weather:{id:'clear'},floodlightsOn:true,penalties:0,repPenalties:0,penaltyLog:[]};
+  const state={activeJob:job};
+  const alerts=[];
+  const tap=gameFunction('tapLug',{state,WEATHER_CONDITIONS:[{id:'clear'}],STAR_ORDER:[1,3,5,2,4],addBayPenalty:(j,c,r,p)=>{if(!j.penaltyLog.some(x=>x.reason===r)){j.penalties+=c;j.repPenalties+=p;j.penaltyLog.push({reason:r});}},showAlert:(t)=>alerts.push(t),showBayActionHint:()=>{},renderBay:()=>{},SoundFX:{error:()=>{},impact:()=>{},torqueClick:()=>{}},triggerLugSpin:()=>{},Math:{random:()=>1}});
+  tap(3);
+  assert.equal(job.torqueIdx,0);
+  assert.equal(job.penalties,12);
+  for(const id of [1,3,5,2,4]) tap(id);
+  assert.equal(job.torqueIdx,5);
+  assert.ok(alerts.some(x=>/STAR-PATTERN/.test(x)));
+});
+
+test('PSI calibration clamps input, flags dangerous over-inflation once, and permits safe bleeding', () => {
+  const job={step:4,psi:32,veh:{targetPsi:35},penalties:0,repPenalties:0,penaltyLog:[]};
+  const state={activeJob:job};
+  const alerts=[];
+  let meterUpdates=0, stopped=0;
+  const apply=gameFunction('applyPsiTick',{state,stopHoldPsi:()=>{stopped++;},addBayPenalty:(j,c,r,p)=>{if(!j.penaltyLog.some(x=>x.reason===r)){j.penalties+=c;j.repPenalties+=p;j.penaltyLog.push({reason:r});}},showAlert:(t)=>alerts.push(t),renderBay:()=>{},SoundFX:{air:()=>{}},updateLivePsiMeter:()=>{meterUpdates++;}});
+  apply(200);
+  assert.equal(job.psi,130);
+  assert.equal(job.penalties,15);
+  apply(1);
+  assert.equal(job.penalties,15);
+  apply(-95);
+  assert.equal(job.psi,35);
+  assert.ok(meterUpdates>=2);
+  assert.ok(stopped>=1);
+});
+
+test('PSI lock rejects out-of-range pressure then advances only when within tool tolerance', () => {
+  const job={step:4,fixed:true,psi:45,veh:{targetPsi:35}};
+  const state={activeJob:job,tools:{comp:{level:1}}};
+  const alerts=[];
+  const lock=gameFunction('lockPsi',{state,showBayActionHint:()=>{},showAlert:(t)=>alerts.push(t),addBayPenalty:()=>{},renderBay:()=>{},dismissAlert:()=>{},SoundFX:{torqueClick:()=>{}}});
+  lock();
+  assert.equal(job.step,4);
+  job.psi=37;
+  lock();
+  assert.equal(job.step,5);
+  assert.ok(alerts.some(x=>/PSI OUT OF SPEC/.test(x)));
+});
+
+test('vehicle cannot be released until repair and all five torque steps are complete', () => {
+  const job={step:5,torqueIdx:4,fixed:true,jackLowered:false};
+  const state={activeJob:job};
+  const alerts=[];
+  const lower=gameFunction('lowerJackAndFinish',{state,showBayActionHint:()=>{},showAlert:(t)=>alerts.push(t),SoundFX:{jack:()=>{}},renderBay:()=>{},setTimeout:()=>{}});
+  lower();
+  assert.equal(job.jackLowered,false);
+  assert.ok(alerts.some(x=>/TORQUE ALL FIVE/.test(x)));
+  job.torqueIdx=5;
+  job.fixed=false;
+  lower();
+  assert.equal(job.jackLowered,false);
+  job.fixed=true;
+  lower();
+  assert.equal(job.jackLowered,true);
+});
