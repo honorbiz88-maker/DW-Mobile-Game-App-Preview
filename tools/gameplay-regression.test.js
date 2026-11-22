@@ -1407,3 +1407,162 @@ test('temporary Firebase diagnostics are not exposed in the player account panel
   assert.match(cloudSource, /onAuthStateChanged\(auth, user =>/);
   assert.match(cloudSource, /Sign in to back up your career across devices/);
 });
+
+
+// Execute the real cloud module against a deterministic Firebase/DOM harness.
+// This validates module behavior and account/save transitions without claiming
+// that the live Firebase project or a real browser has been exercised.
+function cloudModuleHarness({ local = {}, cloud = {}, user = null, online = true } = {}) {
+  const store = new Map(Object.entries(local));
+  const cloudDocs = new Map(Object.entries(cloud));
+  const elements = new Map();
+  const timers = new Map();
+  const calls = { gets: [], writes: [], reloads: 0, modal: '', listeners: {} };
+  const elementIds = [
+    'cloud-account-card', 'cloud-create', 'cloud-signin', 'cloud-reset', 'cloud-signout',
+    'cloud-email', 'cloud-password', 'cloud-account-status', 'cloud-signed-out',
+    'cloud-signed-in', 'cloud-user-email'
+  ];
+  for (const id of elementIds) {
+    elements.set(id, {
+      id, value: '', hidden: false, textContent: '', style: {}, dataset: {},
+      addEventListener(type, callback) { calls.listeners[id + ':' + type] = callback; }
+    });
+  }
+  const document = { getElementById: id => elements.get(id) || null };
+  const localStorage = {
+    getItem: key => store.has(key) ? store.get(key) : null,
+    setItem: (key, value) => store.set(key, String(value)),
+    removeItem: key => store.delete(key)
+  };
+  const auth = { currentUser: user };
+  let authObserver = null;
+  const db = {};
+  const pathKey = ref => ref.path;
+  const context = {
+    document, localStorage, navigator: { onLine: online },
+    crypto: { randomUUID: () => 'test-device-id' },
+    Date, Math, JSON, console,
+    setTimeout(callback, delay) { const id = timers.size + 1; timers.set(id, { callback, delay }); return id; },
+    clearTimeout(id) { timers.delete(id); },
+    window: {
+      addEventListener() {},
+      openModal(html) { calls.modal = html; },
+      closeModal() { calls.modal = ''; }
+    },
+    location: { reload() { calls.reloads += 1; } },
+    initializeApp: config => ({ config }),
+    getAuth: () => auth,
+    getFirestore: () => db,
+    onAuthStateChanged(_auth, callback) { authObserver = callback; callback(auth.currentUser); },
+    createUserWithEmailAndPassword: async (_auth, email) => {
+      auth.currentUser = { uid: 'account-new', email };
+      authObserver(auth.currentUser);
+      return { user: auth.currentUser };
+    },
+    signInWithEmailAndPassword: async (_auth, email) => {
+      auth.currentUser = { uid: 'account-signin', email };
+      authObserver(auth.currentUser);
+      return { user: auth.currentUser };
+    },
+    sendPasswordResetEmail: async () => {},
+    signOut: async () => { auth.currentUser = null; authObserver(null); },
+    doc: (_db, ...parts) => ({ path: parts.join('/') }),
+    getDoc: async ref => {
+      calls.gets.push(pathKey(ref));
+      const value = cloudDocs.get(pathKey(ref));
+      return { exists: () => value !== undefined, data: () => value };
+    },
+    setDoc: async (ref, value) => {
+      calls.writes.push({ path: pathKey(ref), value });
+      cloudDocs.set(pathKey(ref), value);
+    },
+    serverTimestamp: () => ({ seconds: 123456 }),
+    localSnapshot: undefined
+  };
+  const executable = cloudSource.replace(/^import[\\s\\S]*?;\\s*/gm, '');
+  vm.runInNewContext(executable, context, { timeout: 1000 });
+  return { store, cloudDocs, elements, calls, timers, context, auth, trigger: async (id, type = 'click') => {
+    const callback = calls.listeners[id + ':' + type];
+    assert.equal(typeof callback, 'function', 'Missing event handler for ' + id);
+    await callback();
+    await new Promise(resolve => setImmediate(resolve));
+  } };
+}
+
+test('Firebase module leaves guest careers local until the player opts into an account', async () => {
+  const career = { cash: 425, jobsCompleted: 7 };
+  const h = cloudModuleHarness({ local: { delwin_v4_save: JSON.stringify(career) } });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.store.get('delwin_v4_save'), JSON.stringify(career));
+  assert.equal(h.calls.gets.length, 0);
+  assert.equal(h.calls.writes.length, 0);
+  assert.equal(h.elements.get('cloud-signed-out').hidden, false);
+  assert.match(h.elements.get('cloud-account-status').textContent, /Sign in to back up/);
+});
+
+test('creating an account backs up the existing guest career without replacing it', async () => {
+  const career = { cash: 875, jobsCompleted: 19, parts: 4 };
+  const h = cloudModuleHarness({ local: { delwin_v4_save: JSON.stringify(career) } });
+  h.elements.get('cloud-email').value = 'player@example.com';
+  h.elements.get('cloud-password').value = 'test-password';
+  await h.trigger('cloud-create');
+  const ref = 'users/account-new/saves/current';
+  assert.equal(h.calls.writes.length, 1);
+  assert.equal(h.calls.writes[0].path, ref);
+  assert.deepEqual(JSON.parse(JSON.stringify(h.calls.writes[0].value.payload)), career);
+  assert.equal(h.store.get('delwin_v4_save'), JSON.stringify(career));
+  assert.equal(h.store.get('delwin_cloud_owner_uid'), 'account-new');
+  assert.equal(h.elements.get('cloud-signed-in').hidden, false);
+  await h.trigger('cloud-signout');
+  assert.equal(h.store.get('delwin_v4_save'), JSON.stringify(career));
+  assert.equal(h.store.has('delwin_cloud_owner_uid'), true);
+});
+
+test('a different account cannot silently upload the device career and cloud restore backs it up', async () => {
+  const localCareer = { cash: 900, jobsCompleted: 25 };
+  const cloudCareer = { cash: 120, jobsCompleted: 4 };
+  const cloudDoc = { schemaVersion: 1, payload: cloudCareer, updatedAt: { toDate: () => new Date(0) }, deviceId: 'other-device' };
+  const h = cloudModuleHarness({
+    local: { delwin_v4_save: JSON.stringify(localCareer), delwin_cloud_owner_uid: 'account-A' },
+    cloud: { 'users/account-B/saves/current': cloudDoc },
+    user: { uid: 'account-B', email: 'b@example.com' }
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.calls.writes.length, 0);
+  assert.match(h.calls.modal, /SAVE CONFLICT/);
+  assert.doesNotMatch(h.calls.modal, /KEEP THIS DEVICE/);
+  assert.match(h.calls.modal, /RESTORE CLOUD CAREER/);
+  h.context.window.DelWinCloud.keepCloud();
+  assert.deepEqual(JSON.parse(h.store.get('delwin_v4_save')), cloudCareer);
+  assert.equal(h.store.get('delwin_cloud_owner_uid'), 'account-B');
+  assert.equal(h.store.get('delwin_backup_before-cloud-change_1'), JSON.stringify(localCareer));
+  assert.equal(h.calls.reloads, 1);
+});
+
+test('a fresh device restores a valid cloud career and records its account owner', async () => {
+  const cloudCareer = { cash: 640, jobsCompleted: 12, parts: 3 };
+  const cloudDoc = { schemaVersion: 1, payload: cloudCareer, updatedAt: { seconds: 10 }, deviceId: 'first-device' };
+  const h = cloudModuleHarness({
+    cloud: { 'users/account-C/saves/current': cloudDoc },
+    user: { uid: 'account-C', email: 'c@example.com' }
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(JSON.parse(h.store.get('delwin_v4_save')), cloudCareer);
+  assert.equal(h.store.get('delwin_cloud_owner_uid'), 'account-C');
+  assert.equal(h.calls.reloads, 1);
+  assert.equal(h.calls.writes.length, 0);
+});
+
+test('offline saves stay local and do not attempt a cloud write', async () => {
+  const h = cloudModuleHarness({
+    local: { delwin_v4_save: JSON.stringify({ cash: 50 }), delwin_cloud_owner_uid: 'account-D' },
+    user: { uid: 'account-D', email: 'd@example.com' },
+    cloud: { 'users/account-D/saves/current': { schemaVersion: 1, payload: { cash: 50 }, updatedAt: {}, deviceId: 'd' } },
+    online: false
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  h.context.window.DelWinCloud.queueSave({ cash: 75 });
+  assert.equal(h.calls.writes.length, 0);
+  assert.equal(h.store.get('delwin_v4_save'), JSON.stringify({ cash: 50 }));
+});
