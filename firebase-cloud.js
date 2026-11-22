@@ -129,9 +129,11 @@ function showConflict(localRaw, cloudData, localOwnerUid = currentUser?.uid || n
     <span class="badge">SAVE CONFLICT</span>
     <h3>Two career saves found</h3>
     <p style="font-size:12px;color:var(--muted);">This device has a local career and your account has a different cloud career (last cloud update: ${date}). Neither copy has been changed.</p>
-    <button class="primary-btn" onclick="window.DelWinCloud.keepLocal()">KEEP THIS DEVICE'S CAREER</button>
+    ${localOwnerUid && currentUser?.uid && localOwnerUid !== currentUser.uid
+      ? '<p style="font-size:12px;color:var(--muted);">This device career is linked to a different account. It cannot be uploaded to the account currently signed in.</p>'
+      : '<button class="primary-btn" onclick="window.DelWinCloud.keepLocal()">KEEP THIS DEVICE\'S CAREER</button>'}
     <button class="secondary-btn" onclick="window.DelWinCloud.keepCloud()">RESTORE CLOUD CAREER</button>
-    <p style="font-size:10px;color:var(--muted);">The copy you do not choose will be backed up on this device before anything is replaced.</p>
+    <p style="font-size:10px;color:var(--muted);">The device career will be backed up on this device before the cloud career replaces it.</p>
   `);
   window.DelWinCloud.pendingConflict = { localRaw, cloudData, uid: currentUser?.uid || null, localOwnerUid };
 }
