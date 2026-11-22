@@ -1378,11 +1378,32 @@ function refreshJobs() {
   renderJobs();
 }
 
+function getDispatchRiskScore(job) {
+  const weather = job.weather || WEATHER_CONDITIONS[0];
+  return (job.isRusted ? 2 : 0) +
+    (job.hasWheelLock ? 1 : 0) +
+    (weather.id === 'rain' || weather.id === 'night' ? 1 : 0) +
+    (job.veh && job.veh.heavy ? 1 : 0) +
+    (job.vip ? 2 : 0);
+}
+
 function renderJobs() {
   const wrap = document.getElementById('job-list');
   if (!wrap) return;
   const radarLvl = state.tools.radar.level;
-  wrap.innerHTML = state.jobs.map((j) => {
+  const firstCallRecommendation = (!state.jobsCompleted && state.tutorialDone)
+    ? state.jobs.map((job, index) => {
+        const heavyJob = !!job.veh.heavy;
+        const needsTireStock = job.dmg && job.dmg.action === 'swap';
+        const hasRequiredStock = needsTireStock
+          ? (heavyJob ? state.hdTires > 0 : state.stdTires > 0)
+          : state.plugs > 0;
+        return { job, index, hasRequiredStock, risk: getDispatchRiskScore(job) };
+      })
+        .filter((item) => item.hasRequiredStock && !item.job.vip && !item.job.veh.heavy && item.risk <= 2)
+        .sort((a, b) => a.risk - b.risk || (b.job.timeLimit || 0) - (a.job.timeLimit || 0))[0] || null
+    : null;
+  wrap.innerHTML = state.jobs.map((j, jobIndex) => {
     const w = j.weather || WEATHER_CONDITIONS[0];
     const heavy = !!j.veh.heavy;
     const needsTire = j.dmg && j.dmg.action === 'swap';
@@ -1394,7 +1415,8 @@ function renderJobs() {
     // This estimate includes the actual marginal restock cost of the consumed supply,
     // but excludes performance bonuses and penalties.
     const projected = Math.max(0, j.pay * (state.surgeJobs > 0 ? 2 : 1) - overhead - supplyCost);
-    const risk = (j.isRusted ? 2 : 0) + (j.hasWheelLock ? 1 : 0) + (w.id === 'rain' || w.id === 'night' ? 1 : 0) + (heavy ? 1 : 0) + (j.vip ? 2 : 0);
+    const risk = getDispatchRiskScore(j);
+    const isRecommendedFirstCall = !!firstCallRecommendation && firstCallRecommendation.index === jobIndex;
     const riskLabel = risk >= 5 ? 'HIGH RISK' : risk >= 3 ? 'MODERATE' : 'ROUTINE';
     const riskColor = risk >= 5 ? '#fb7185' : risk >= 3 ? '#fbbf24' : '#34d399';
     const hazardBadge = radarLvl >= 2 && j.isRusted
@@ -1412,6 +1434,7 @@ function renderJobs() {
           <div>
             <span class="badge">${j.vip ? '⚡ VIP COMMERCIAL SNIPE' : j.veh.label}</span>
             <span class="badge" style="margin-left:4px;">${w.label}</span>
+            ${isRecommendedFirstCall ? '<span class="badge" style="margin-left:4px;color:#34d399;border-color:#34d399;">★ RECOMMENDED FIRST CALL</span>' : ''}
             <h3 style="font-size:14px;margin-top:5px;">${j.title}</h3>
           </div>
           <div class="job-pay">$ ${j.pay}${state.surgeJobs > 0 ? ' · 2X' : ''}</div>
@@ -1429,6 +1452,7 @@ function renderJobs() {
           <span>⭐ +${j.baseRep || 30} REP</span>
         </div>
         <div class="dispatch-prep-note ${stockReady ? 'ready' : 'warning'}">${stockReady ? '✓' : '⚠'} ${prepText}</div>
+        ${isRecommendedFirstCall ? '<p style="font-size:11px;color:#34d399;margin:5px 0 0;">Good starter choice: required supplies are on hand and this is one of your lowest-risk calls.</p>' : ''}
         <button class="primary-btn" ${!stockReady ? 'disabled' : ''} onclick="acceptJob('${j.id}')">
           ${!stockReady ? 'RESTOCK REQUIRED' : j.vip ? `SNIPE DISPATCH (${j.snipeCost} ⚡)` : 'ACCEPT & ROLL RIG'}
         </button>
