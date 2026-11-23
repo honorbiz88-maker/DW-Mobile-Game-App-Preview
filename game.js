@@ -3013,6 +3013,11 @@ function bootDelWinMobile() {
   if (state.tutorialDone && !state.firstDispatchBriefingSeen) showFirstDispatchBriefing();
 }
 
+window.addEventListener('pagehide', () => saveState('session-end'));
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') saveState('session-background');
+});
+
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', bootDelWinMobile);
 } else {
