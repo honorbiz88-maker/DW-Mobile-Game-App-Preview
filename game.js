@@ -300,6 +300,12 @@ function loadState() {
 
 function saveState(checkpointType = 'gameplay') {
   try {
+    // A second tab is read-only while another tab owns the active career lock.
+    // The lock owner flushes any boot-time save after it acquires the writer role.
+    if (window.__delwinWriterTab === false) {
+      window.__delwinPendingSaveCheckpoint = checkpointType;
+      return;
+    }
     // During an accepted cloud restore, Firebase owns the save decision.
     // Do not let startup normalization or boot-time mutations overwrite it.
     if (window.DelWinCloud?.isRestorePending?.()) return;
@@ -314,6 +320,15 @@ function saveState(checkpointType = 'gameplay') {
     console.error("DelWin local career save failed", e);
   }
 }
+
+function flushPendingSaveAfterWriterLock() {
+  if (window.__delwinWriterTab !== true || !window.__delwinPendingSaveCheckpoint) return;
+  const checkpointType = window.__delwinPendingSaveCheckpoint;
+  window.__delwinPendingSaveCheckpoint = null;
+  saveState(checkpointType);
+}
+window.addEventListener('delwin-save-writer-ready', flushPendingSaveAfterWriterLock);
+flushPendingSaveAfterWriterLock();
 
 // Cloud updates may be applied in-place only at a safe gameplay boundary.
 // Never replace an in-progress repair or a modal interaction.
