@@ -9,14 +9,16 @@ service cloud.firestore {
 
       function validSave() {
         return request.resource.data.keys().hasAll([
-            'schemaVersion', 'payload', 'updatedAt', 'deviceId'
+            'schemaVersion', 'payload', 'revision', 'updatedAt', 'deviceId'
           ])
           && request.resource.data.keys().hasOnly([
-            'schemaVersion', 'payload', 'updatedAt', 'deviceId'
+            'schemaVersion', 'payload', 'revision', 'updatedAt', 'deviceId'
           ])
           && request.resource.data.schemaVersion is int
           && request.resource.data.schemaVersion >= 1
           && request.resource.data.payload is map
+          && request.resource.data.revision is int
+          && request.resource.data.revision >= 1
           && request.resource.data.updatedAt is timestamp
           && request.resource.data.deviceId is string
           && request.resource.data.deviceId.size() <= 128;
