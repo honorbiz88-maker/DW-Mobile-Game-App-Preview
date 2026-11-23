@@ -1595,14 +1595,15 @@ test('stale device revision cannot overwrite a newer cloud career', async () => 
     cloud: { 'users/account-revision/saves/current': { schemaVersion: 1, revision: 4, payload: { cash: 900, jobsCompleted: 16 }, updatedAt: {}, deviceId: 'newer-device' } },
     online: false
   });
-  await new Promise(resolve => setImmediate(resolve));
+  for (let i = 0; i < 5; i += 1) await new Promise(resolve => setImmediate(resolve));
   h.context.window.DelWinCloud.queueSave({ cash: 525, jobsCompleted: 9 });
   h.cloudDocs.set('users/account-revision/saves/current', {
     schemaVersion: 1, revision: 5, payload: newerCloud, updatedAt: {}, deviceId: 'newer-device'
   });
   h.context.navigator.onLine = true;
   await h.context.window.__onlineHandler();
-  await new Promise(resolve => setImmediate(resolve));
+  for (let i = 0; i < 5; i += 1) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.calls.writes.length, 1, 'The queued save must attempt its compare-and-set write');
   assert.equal(h.cloudDocs.get('users/account-revision/saves/current').revision, 5);
   assert.deepEqual(JSON.parse(JSON.stringify(h.cloudDocs.get('users/account-revision/saves/current').payload)), newerCloud);
   assert.match(h.calls.modal, /Device progress protected/);
