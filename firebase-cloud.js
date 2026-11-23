@@ -493,11 +493,12 @@ async function flushPendingSave(expectedUid) {
   }
   writing = true;
   const next = pendingPayload.payload;
+  const checkpoint = pendingPayload.checkpoint || {};
   pendingPayload = null;
   syncTimer = null;
   let retryDelay = 1400;
   try {
-    await writeCloud(next, expectedUid, cloudRevision, pendingPayload?.checkpoint || {});
+    await writeCloud(next, expectedUid, cloudRevision, checkpoint);
     if (currentUser?.uid === expectedUid) {
       let restoreMarker = null;
       try { restoreMarker = JSON.parse(localStorage.getItem(RESTORE_MARKER_KEY) || "null"); } catch {}
