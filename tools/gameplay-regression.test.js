@@ -1586,7 +1586,11 @@ test('stale device revision cannot overwrite a newer cloud career', async () => 
   const deviceCareer = { cash: 500, jobsCompleted: 8 };
   const newerCloud = { cash: 950, jobsCompleted: 17 };
   const h = cloudModuleHarness({
-    local: { delwin_v4_save: JSON.stringify(deviceCareer), delwin_cloud_owner_uid: 'account-revision' },
+    local: {
+      delwin_v4_save: JSON.stringify(deviceCareer),
+      delwin_cloud_owner_uid: 'account-revision',
+      delwin_cloud_synced_snapshot: JSON.stringify({ cash: 900, jobsCompleted: 16 })
+    },
     user: { uid: 'account-revision', email: 'revision@example.com' },
     cloud: { 'users/account-revision/saves/current': { schemaVersion: 1, revision: 4, payload: { cash: 900, jobsCompleted: 16 }, updatedAt: {}, deviceId: 'newer-device' } },
     online: false
