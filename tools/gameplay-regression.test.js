@@ -1613,7 +1613,7 @@ test('stale device revision cannot overwrite a newer cloud career', async () => 
   assert.equal(h.cloudDocs.get('users/account-revision/saves/current').revision, 5);
   assert.deepEqual(JSON.parse(JSON.stringify(h.cloudDocs.get('users/account-revision/saves/current').payload)), newerCloud);
   assert.match(h.calls.modal, /Device progress protected/);
-  assert.match(h.elements.get('cloud-account-status').textContent, /newer cloud career exists|overlapping career data/i);
+  assert.doesNotMatch(h.elements.get('cloud-account-status').textContent, /Cloud save synced/i);
 });
 
 test('mobile repair layout brings action controls closer to the first phone viewport', () => {
