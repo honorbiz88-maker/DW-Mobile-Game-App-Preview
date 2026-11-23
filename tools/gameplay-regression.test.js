@@ -1356,7 +1356,8 @@ test('temporary Firebase diagnostics are not exposed in the player account panel
 // This validates module behavior and account/save transitions without claiming
 // that the live Firebase project or a real browser has been exercised.
 function cloudModuleHarness({ local = {}, cloud = {}, user = null, online = true, failWrites = 0 } = {}) {
-  const store = new Map(Object.entries(local));\n  const sessionStore = new Map();
+  const store = new Map(Object.entries(local));
+  const sessionStore = new Map();
   const cloudDocs = new Map(Object.entries(cloud));
   const elements = new Map();
   const timers = new Map();
