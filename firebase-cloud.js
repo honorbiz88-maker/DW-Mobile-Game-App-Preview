@@ -507,10 +507,19 @@ function switchActiveAccountIfNeeded(user) {
       if (baseline) localStorage.setItem(accountStorageKey(ownerUid, "baseline"), baseline);
       const outbox = readDurableOutbox();
       if (outbox?.uid === ownerUid) localStorage.setItem(accountStorageKey(ownerUid, "outbox"), JSON.stringify(outbox));
+      const restoreMarker = localStorage.getItem(RESTORE_MARKER_KEY);
+      if (restoreMarker) {
+        try {
+          if (JSON.parse(restoreMarker)?.uid === ownerUid) {
+            localStorage.setItem(accountStorageKey(ownerUid, "restore"), restoreMarker);
+          }
+        } catch {}
+      }
     }
     const incomingCareer = localStorage.getItem(accountStorageKey(user.uid, "career"));
     const incomingBaseline = localStorage.getItem(accountStorageKey(user.uid, "baseline"));
     const incomingOutbox = localStorage.getItem(accountStorageKey(user.uid, "outbox"));
+    const incomingRestoreMarker = localStorage.getItem(accountStorageKey(user.uid, "restore"));
     // Validate the incoming snapshot before installing it in the active slot.
     if (incomingCareer) {
       const parsedIncoming = JSON.parse(incomingCareer);
@@ -532,6 +541,16 @@ function switchActiveAccountIfNeeded(user) {
     if (incomingOutbox) {
       const parsedOutbox = JSON.parse(incomingOutbox);
       if (parsedOutbox?.uid === user.uid) localStorage.setItem(OUTBOX_KEY, incomingOutbox);
+    }
+    // Restore intent is account-owned too. Never let a pending restore for
+    // account A be applied after the player switches to account B.
+    localStorage.removeItem(RESTORE_MARKER_KEY);
+    if (incomingRestoreMarker) {
+      try {
+        if (JSON.parse(incomingRestoreMarker)?.uid === user.uid) {
+          localStorage.setItem(RESTORE_MARKER_KEY, incomingRestoreMarker);
+        }
+      } catch {}
     }
     status("Switched accounts. Loading this account's saved career…");
     location.reload();
