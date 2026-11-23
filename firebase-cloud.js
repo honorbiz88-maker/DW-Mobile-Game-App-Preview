@@ -242,11 +242,12 @@ function showConflict(localRaw, cloudData, localOwnerUid = currentUser?.uid || n
   open(`
     <span class="badge">SAVE SYNC</span>
     <h3>Device progress protected</h3>
-    <p style="font-size:12px;color:var(--muted);">This device has a career that differs from the account backup (last cloud update: ${date}). Your device career remains the active save. The cloud copy will be preserved before syncing.</p>
+    <p style="font-size:12px;color:var(--muted);">This device has a career that differs from the account backup (last cloud update: ${date}). Your device career remains the active save. Neither save has been replaced.</p>
     ${localOwnerUid && currentUser?.uid && localOwnerUid !== currentUser.uid
       ? '<p style="font-size:12px;color:var(--muted);">This device career belongs to a different account and will not be uploaded to the account currently signed in.</p>'
       : '<button class="primary-btn" onclick="window.DelWinCloud.keepLocal()">KEEP DEVICE SAVE AND BACK UP</button>'}
     <p style="font-size:10px;color:var(--muted);">Cloud restoration is reserved for a new device without an established local career. An older cloud timestamp will never replace an established device career.</p>
+    <button type="button" class="secondary-btn" onclick="window.closeModal()">CONTINUE WITH DEVICE CAREER</button>
   `);
   window.DelWinCloud.pendingConflict = { localRaw, cloudData, uid: currentUser?.uid || null, localOwnerUid };
 }
