@@ -19,6 +19,9 @@ const firebaseConfig = {
 const LOCAL_KEY = "delwin_v4_save";
 const OWNER_KEY = "delwin_cloud_owner_uid";
 const LOCAL_REVISION_KEY = "delwin_cloud_revision";
+const SYNCED_SNAPSHOT_KEY = "delwin_cloud_synced_snapshot";
+const SESSION_KEY = "delwin_session_id";
+const SESSION_STARTED_KEY = "delwin_session_started_at";
 const RESTORE_MARKER_KEY = "delwin_cloud_restore_pending";
 const SCHEMA_VERSION = 1;
 const app = initializeApp(firebaseConfig);
@@ -33,6 +36,7 @@ let cloudWatchUnsubscribe = null;
 let cloudWatchUid = null;
 let lastObservedCloudRevision = -1;
 let pendingPayload = null;
+let deferredCloudUpdate = null;
 let busy = false;
 let writing = false;
 const reconcilingUids = new Set();
@@ -142,14 +146,29 @@ function backupLocal(raw, suffix = "before-cloud-change") {
   localStorage.setItem(key, raw);
   return key;
 }
-function saveEnvelope(payload, revision) {
+function saveEnvelope(payload, revision, checkpoint = {}) {
   return {
     schemaVersion: SCHEMA_VERSION,
     payload,
     revision,
     updatedAt: serverTimestamp(),
-    deviceId: getDeviceId()
+    deviceId: getDeviceId(),
+    sessionId: getSessionId(),
+    sessionStartedAt: Number(localStorage.getItem(SESSION_STARTED_KEY)) || Date.now(),
+    clientSavedAt: Date.now(),
+    checkpointType: typeof checkpoint.type === "string" ? checkpoint.type : "gameplay"
   };
+}
+function getSessionId() {
+  let id = sessionStorage.getItem(SESSION_KEY);
+  if (!id) {
+    id = (crypto.randomUUID ? crypto.randomUUID() : 'session-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+    sessionStorage.setItem(SESSION_KEY, id);
+    const started = String(Date.now());
+    sessionStorage.setItem(SESSION_STARTED_KEY, started);
+    localStorage.setItem(SESSION_STARTED_KEY, started);
+  }
+  return id;
 }
 function getDeviceId() {
   let id = localStorage.getItem("delwin_device_id");
@@ -178,7 +197,7 @@ function showConflict(localRaw, cloudData, localOwnerUid = currentUser?.uid || n
   `);
   window.DelWinCloud.pendingConflict = { localRaw, cloudData, uid: currentUser?.uid || null, localOwnerUid };
 }
-async function writeCloud(payload, expectedUid = currentUser?.uid, expectedRevision = cloudRevision) {
+async function writeCloud(payload, expectedUid = currentUser?.uid, expectedRevision = cloudRevision, checkpoint = {}) {
   if (!expectedUid || !currentUser || currentUser.uid !== expectedUid) {
     throw new Error("Account changed before the save could sync. Your local career is safe.");
   }
@@ -196,13 +215,42 @@ async function writeCloud(payload, expectedUid = currentUser?.uid, expectedRevis
     if (!currentUser || currentUser.uid !== expectedUid) {
       throw new Error("Account changed before the save could sync. Your local career is safe.");
     }
-    transaction.set(ref, saveEnvelope(payload, nextRevision));
+    transaction.set(ref, saveEnvelope(payload, nextRevision, checkpoint));
   });
   if (currentUser?.uid === expectedUid) {
     cloudRevision = nextRevision;
-    if (localStorage.getItem(OWNER_KEY) === expectedUid) localStorage.setItem(LOCAL_REVISION_KEY, String(nextRevision));
+    if (localStorage.getItem(OWNER_KEY) === expectedUid) {
+      localStorage.setItem(LOCAL_REVISION_KEY, String(nextRevision));
+      localStorage.setItem(SYNCED_SNAPSHOT_KEY, JSON.stringify(payload));
+    }
   }
   return nextRevision;
+}
+function tryApplyNewerCloud(cloud, local) {
+  const payload = cloud?.payload;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return false;
+  let baseline = null;
+  try { baseline = JSON.parse(localStorage.getItem(SYNCED_SNAPSHOT_KEY) || 'null'); } catch {}
+  if (!baseline || JSON.stringify(local.payload) !== JSON.stringify(baseline)) return false;
+  const apply = window.DelWinApplyCloudSave;
+  if (typeof apply !== 'function' || !apply(payload)) { deferredCloudUpdate = cloud; return true; }
+  const revision = Number.isSafeInteger(cloud.revision) ? cloud.revision : 0;
+  cloudRevision = revision; lastObservedCloudRevision = Math.max(lastObservedCloudRevision, revision);
+  localStorage.setItem(LOCAL_REVISION_KEY, String(revision));
+  localStorage.setItem(SYNCED_SNAPSHOT_KEY, JSON.stringify(payload));
+  pendingPayload = null; status('Cloud career updated.'); return true;
+}
+function processDeferredCloudUpdate() {
+  if (!deferredCloudUpdate || !currentUser || !syncReady) return;
+  const cloud = deferredCloudUpdate; deferredCloudUpdate = null;
+  const local = localSnapshot(); if (!local || local.invalid) return;
+  const revision = Number.isSafeInteger(cloud.revision) ? cloud.revision : 0;
+  const localRevision = Number.parseInt(localStorage.getItem(LOCAL_REVISION_KEY) || '0', 10) || 0;
+  if (revision <= localRevision) return;
+  if (tryApplyNewerCloud(cloud, local)) return;
+  syncReady = false; pendingPayload = null; cloudRevision = revision;
+  showConflict(local.raw, cloud, local.ownerUid);
+  status('Both devices have made progress. Both saves are preserved; choose which career to keep.', true);
 }
 function watchCloud(user) {
   if (cloudWatchUid === user.uid && cloudWatchUnsubscribe) return;
@@ -222,11 +270,12 @@ function watchCloud(user) {
     if (!local || local.invalid) return;
     const localRevision = Number.parseInt(localStorage.getItem(LOCAL_REVISION_KEY) || "0", 10) || 0;
     if (revision > localRevision && JSON.stringify(local.payload) !== JSON.stringify(cloud.payload)) {
+      cloudRevision = revision;
+      if (tryApplyNewerCloud(cloud, local)) return;
       syncReady = false;
       pendingPayload = null;
-      cloudRevision = revision;
       showConflict(local.raw, cloud, local.ownerUid);
-      status("A newer career was saved on another device. Choose which copy to keep; neither has been changed.", true);
+      status("Both devices have made progress. Both saves are preserved; choose which career to keep.", true);
     } else if (JSON.stringify(local.payload) === JSON.stringify(cloud.payload)) {
       localStorage.setItem(LOCAL_REVISION_KEY, String(revision));
       cloudRevision = revision;
@@ -319,12 +368,17 @@ async function reconcile(user) {
         const localRevision = Number.parseInt(localStorage.getItem(LOCAL_REVISION_KEY) || "0", 10) || 0;
         const localMatchesCloud = JSON.stringify(local.payload) === JSON.stringify(cloud.payload);
         if (cloudRevisionOnServer > localRevision && !localMatchesCloud) {
-          showConflict(local.raw, cloud, local.ownerUid);
-          status("A newer career was saved on another device. Choose which copy to keep; neither has been changed.", true);
-          return;
+          if (tryApplyNewerCloud(cloud, local)) {
+            status("Your latest cloud career was restored in the background.");
+          } else {
+            showConflict(local.raw, cloud, local.ownerUid);
+            status("Both devices have made progress. Both saves are preserved; choose which career to keep.", true);
+            return;
+          }
         }
         if (localMatchesCloud || cloudRevisionOnServer === localRevision) {
           localStorage.setItem(LOCAL_REVISION_KEY, String(cloudRevisionOnServer));
+          if (localMatchesCloud) localStorage.setItem(SYNCED_SNAPSHOT_KEY, JSON.stringify(cloud.payload));
         }
         status("Cloud backup connected · this device is ready.");
       }
@@ -443,7 +497,7 @@ async function flushPendingSave(expectedUid) {
   syncTimer = null;
   let retryDelay = 1400;
   try {
-    await writeCloud(next, expectedUid);
+    await writeCloud(next, expectedUid, cloudRevision, pendingPayload?.checkpoint || {});
     if (currentUser?.uid === expectedUid) {
       let restoreMarker = null;
       try { restoreMarker = JSON.parse(localStorage.getItem(RESTORE_MARKER_KEY) || "null"); } catch {}
@@ -486,7 +540,7 @@ async function flushPendingSave(expectedUid) {
     }
   }
 }
-function queueSave(payload) {
+function queueSave(payload, metadata = {}) {
   if (!currentUser || !syncReady) return;
   let restoreMarker = null;
   try { restoreMarker = JSON.parse(localStorage.getItem(RESTORE_MARKER_KEY) || "null"); } catch {}
@@ -499,7 +553,7 @@ function queueSave(payload) {
     return;
   }
   const queuedUid = currentUser.uid;
-  pendingPayload = { uid: queuedUid, payload: JSON.parse(JSON.stringify(payload)) };
+  pendingPayload = { uid: queuedUid, payload: JSON.parse(JSON.stringify(payload)), checkpoint: { type: metadata.checkpointType || "gameplay" } };
   clearTimeout(syncTimer);
   syncTimer = setTimeout(() => flushPendingSave(queuedUid), 1400);
 }
@@ -513,7 +567,7 @@ function isRestorePending() {
     return false;
   }
 }
-window.DelWinCloud = { queueSave, keepLocal, keepCloud, signOut: () => signOut(auth), hasAccount: () => !!currentUser, isRestorePending, pendingConflict: null };
+window.DelWinCloud = { queueSave, keepLocal, keepCloud, onSafeCheckpoint: processDeferredCloudUpdate, signOut: () => signOut(auth), hasAccount: () => !!currentUser, isRestorePending, pendingConflict: null };
 window.addEventListener("online", () => {
   if (!currentUser || !navigator.onLine) return;
   // Retry only an authentication setup that previously failed. Healthy
