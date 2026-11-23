@@ -146,6 +146,93 @@ function backupLocal(raw, suffix = "before-cloud-change") {
   localStorage.setItem(key, raw);
   return key;
 }
+function listLocalBackups() {
+  const backups = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key || !key.startsWith("delwin_backup_")) continue;
+    try {
+      const raw = localStorage.getItem(key);
+      const payload = JSON.parse(raw || "null");
+      if (!payload || typeof payload !== "object" || Array.isArray(payload)) continue;
+      const timestampMatch = key.match(/_(\\d{10,})$/);
+      backups.push({
+        key, raw, payload,
+        timestamp: timestampMatch ? Number(timestampMatch[1]) : 0
+      });
+    } catch {}
+  }
+  return backups.sort((a, b) => b.timestamp - a.timestamp);
+}
+function backupSummary(payload) {
+  const cash = Number.isFinite(payload.cash) ? "$" + Math.floor(payload.cash).toLocaleString() : "Unknown";
+  const tires = Number.isFinite(payload.stdTires) ? Math.floor(payload.stdTires) : "Unknown";
+  const jobs = Number.isFinite(payload.jobsCompleted) ? Math.floor(payload.jobsCompleted) : "Unknown";
+  return { cash, tires, jobs };
+}
+function showBackupRecovery() {
+  const backups = listLocalBackups();
+  if (!backups.length) {
+    status("No recoverable device backups were found in this browser.", true);
+    return;
+  }
+  const backup = backups[0];
+  const summary = backupSummary(backup.payload);
+  const date = backup.timestamp ? new Date(backup.timestamp).toLocaleString() : "Date unavailable";
+  const open = window.openModal;
+  if (typeof open !== "function") return status("Backup recovery is unavailable right now.", true);
+  const options = backups.slice(0, 10).map((item, index) => {
+    const details = backupSummary(item.payload);
+    const when = item.timestamp ? new Date(item.timestamp).toLocaleString() : "Date unavailable";
+    return '<option value="' + index + '">' + when.replace(/[<>]/g, "") + ' · Cash ' + details.cash + ' · Standard tires ' + details.tires + '</option>';
+  }).join("");
+  open(`
+    <span class="badge">DEVICE BACKUP RECOVERY</span>
+    <h3>Recover a previous device save</h3>
+    <p style="font-size:12px;color:var(--muted);">These backups are stored only in this browser. Selecting one will not change anything until you confirm the recovery.</p>
+    <label for="dw-backup-choice" style="display:block;font-size:11px;margin:10px 0 5px;">AVAILABLE BACKUPS</label>
+    <select id="dw-backup-choice" style="width:100%;box-sizing:border-box;">${options}</select>
+    <div id="dw-backup-preview" style="font-size:12px;margin:10px 0;color:var(--muted);">Selected backup: ${date}<br>Cash: ${summary.cash}<br>Standard tires: ${summary.tires}<br>Jobs completed: ${summary.jobs}</div>
+    <button class="primary-btn" onclick="window.DelWinCloud.recoverBackupFromPicker()">RECOVER SELECTED BACKUP</button>
+    <button class="secondary-btn" onclick="window.closeModal?.()">CANCEL</button>
+    <p style="font-size:10px;color:var(--muted);">Your current device save will also be backed up first. The cloud save will be updated only after you confirm and the revision check succeeds.</p>
+  `);
+  window.DelWinCloud.backupChoices = backups.slice(0, 10).map(({key}) => key);
+}
+async function recoverBackupFromPicker() {
+  if (!currentUser || !syncReady) return status("Sign in and wait for cloud backup to connect before recovering a save.", true);
+  const select = document.getElementById("dw-backup-choice");
+  const index = Number.parseInt(select?.value || "0", 10);
+  const key = window.DelWinCloud.backupChoices?.[index];
+  if (!key || !/^delwin_backup_[a-zA-Z0-9_-]+_\\d{10,}$/.test(key)) return status("That backup selection is no longer available.", true);
+  if (window.DelWinApplyCloudSave && (window.DelWinApplyCloudSave.__unused)) return;
+  const modal = document.getElementById("modal-overlay");
+  const stateHasJob = !!window.gameState?.activeJob;
+  if (stateHasJob) return status("Finish the active job before recovering a previous career.", true);
+  const raw = localStorage.getItem(key);
+  let payload;
+  try { payload = JSON.parse(raw || "null"); } catch {}
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return status("The selected backup could not be read. No save was changed.", true);
+  const local = localSnapshot();
+  if (local && !local.invalid) backupLocal(local.raw, "before-backup-recovery");
+  window.closeModal?.();
+  if (typeof window.DelWinApplyCloudSave !== "function" || !window.DelWinApplyCloudSave(payload)) {
+    status("The backup could not be safely applied. Your current save and the selected backup remain unchanged.", true);
+    return;
+  }
+  const uid = currentUser.uid;
+  try {
+    await writeCloud(payload, uid, cloudRevision, {type:"manual-backup-recovery"});
+    if (currentUser?.uid !== uid) return;
+    localStorage.setItem(OWNER_KEY, uid);
+    localStorage.setItem(SYNCED_SNAPSHOT_KEY, JSON.stringify(payload));
+    localStorage.setItem(LOCAL_REVISION_KEY, String(cloudRevision));
+    window.DelWinCloud.backupChoices = null;
+    status("Previous device backup recovered and synced to your account.");
+  } catch (error) {
+    status("The recovered backup is active on this device, but cloud sync did not complete: " + error.message + ". Your previous cloud save was not overwritten.", true);
+  }
+}
 function isStarterCareer(payload) {
   if (!payload || typeof payload !== "object") return false;
   const toolLevels = payload.tools && typeof payload.tools === "object"
@@ -721,7 +808,7 @@ function isRestorePending() {
     return false;
   }
 }
-window.DelWinCloud = { queueSave, keepLocal, keepCloud, onSafeCheckpoint: processDeferredCloudUpdate, signOut: () => signOut(auth), hasAccount: () => !!currentUser, isRestorePending, pendingConflict: null };
+window.DelWinCloud = { queueSave, keepLocal, keepCloud, showBackupRecovery, recoverBackupFromPicker, onSafeCheckpoint: processDeferredCloudUpdate, signOut: () => signOut(auth), hasAccount: () => !!currentUser, isRestorePending, pendingConflict: null, backupChoices: null };
 window.addEventListener("online", () => {
   if (!currentUser || !navigator.onLine) return;
   // Retry only an authentication setup that previously failed. Healthy
