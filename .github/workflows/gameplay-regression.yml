@@ -2,7 +2,7 @@ name: Gameplay regression tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, "fix/fresh-device-starter-detection"]
     paths:
       - "game.js"
       - "index.html"
