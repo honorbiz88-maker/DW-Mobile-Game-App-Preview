@@ -23,8 +23,8 @@ This guide prepares the Firebase project used by the DelWin Mobile game. Keep th
 1. Open **Build → Firestore Database → Create database**.
 2. Choose production mode.
 3. Choose a nearby region. The database region cannot easily be changed later, so choose deliberately.
-4. After creation, open the **Rules** tab and replace the starter rules with the contents of `firestore.rules` in this repository.
-5. Publish the rules.
+4. After creation, open the **Rules** tab and replace the starter rules with the current contents of `firestore.rules` in this repository. Re-publish the rules whenever that file changes; committing it to GitHub does not deploy Firestore rules.
+5. Publish the rules. Confirm the published rules require `schemaVersion`, `payload`, `revision`, `updatedAt`, and `deviceId` for each save document.
 
 The rules allow an authenticated player to read and write only:
 `users/{their-auth-uid}/saves/current`.
@@ -42,6 +42,7 @@ Authentication's common email/password sign-in is included at no cost on the bas
 The cloud document envelope will contain:
 - `schemaVersion`: integer version for future migrations.
 - `payload`: the complete DelWin career save.
+- `revision`: monotonically increasing integer used by transactional compare-and-set writes to prevent stale devices overwriting newer progress.
 - `updatedAt`: Firestore server timestamp.
 - `deviceId`: non-sensitive per-install identifier used for conflict diagnostics.
 
