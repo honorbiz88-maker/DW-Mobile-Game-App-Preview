@@ -2441,7 +2441,7 @@ function completeJob() {
     const firstTime = !state.tutorialDone;
     state.tutorialDone = true;
     if (firstTime) state.tokens += 12;
-    saveState();
+    saveState('job-complete');
     updateHUD();
     openModal(`
       <span class="badge">TRAINING COMPLETE</span>
@@ -2976,6 +2976,7 @@ function openModal(html) {
 
 function closeModal() {
   document.getElementById('modal-overlay').classList.add('hidden');
+  window.DelWinCloud?.onSafeCheckpoint?.();
 }
 
 async function resetSave() {
