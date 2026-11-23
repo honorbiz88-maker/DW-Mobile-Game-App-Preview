@@ -1824,12 +1824,12 @@ test('each device records the cloud revision acknowledged by compare-and-set', (
   assert.match(cloudSource, /localStorage\.setItem\(SYNCED_SNAPSHOT_KEY, JSON\.stringify\(payload\)\)/);
 });
 
-test("cloud sync indicator distinguishes device save from confirmed cloud backup", () => {
-  assert.ok(cloudSource.includes("SAVED LOCALLY"));
-  assert.ok(cloudSource.includes("OFFLINE — SYNC PENDING"));
-  assert.ok(cloudSource.includes("SYNCING TO CLOUD"));
-  assert.ok(cloudSource.includes("CLOUD SYNCED"));
-  assert.ok(fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8").includes('id="cloud-sync-indicator"'));
+test("cloud sync runs immediately for critical saves and quickly batches ordinary saves", () => {
+  assert.ok(cloudSource.includes('const delay = immediateCheckpoints.has(checkpointType) ? 0 : 250'));
+  assert.ok(cloudSource.includes('syncTimer = setTimeout(() => flushPendingSave(queuedUid), delay)'));
+  assert.ok(cloudSource.includes('syncTimer = setTimeout(() => flushPendingSave(expectedUid), 250)'));
+  assert.ok(!fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8").includes('id="cloud-sync-indicator"'));
+  assert.ok(cloudSource.includes('let internalSyncState = "guest"'));
 });
 
 test("background and page-hide lifecycle checkpoints preserve pending cloud work", () => {
