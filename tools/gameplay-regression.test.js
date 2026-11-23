@@ -143,7 +143,7 @@ test('a deliberate cloud restore survives reload without reopening the same conf
   assert.doesNotMatch(reconcile, /queueSave\(local\.payload\)/);
   assert.match(reconcile, /JSON\.stringify\(local\.payload\) === cloudPayload/);
   assert.match(reconcile, /reconcilingUids\.has\(user\.uid\)/);
-  assert.ok(reconcile.indexOf('RESTORE_MARKER_KEY') < reconcile.indexOf('if (!local)'));
+  assert.ok(reconcile.indexOf('RESTORE_MARKER_KEY') < reconcile.indexOf('if (!local && cloud)'));
   assert.match(reconcile, /Cloud career restored and connected/);
   assert.match(cloudSource, /restoreMarker\?\.uid === currentUser\.uid[\s\S]*?cannot be overwritten yet/);
 });
@@ -153,10 +153,10 @@ test('local career owned by another account is never reconciled into the signed-
   const cloudBranch = cloudSource.indexOf('if (snap.exists())', ownerGuard);
   const noCloudBranch = cloudSource.indexOf('Nothing was uploaded', ownerGuard);
   const returnIndex = cloudSource.indexOf('return;', noCloudBranch);
-  const normalReconcile = cloudSource.indexOf('if (!snap.exists())', ownerGuard);
+  const linkedAccountBranch = cloudSource.indexOf('if (local?.ownerUid === user.uid)', ownerGuard);
   assert.ok(ownerGuard >= 0 && cloudBranch > ownerGuard && noCloudBranch > cloudBranch);
-  assert.ok(returnIndex > noCloudBranch && normalReconcile > returnIndex,
-    'Ownership mismatch must stop before normal cloud restore/upload reconciliation');
+  assert.ok(returnIndex > noCloudBranch && linkedAccountBranch > returnIndex,
+    'Ownership mismatch must stop before a different account can upload or adopt the device career');
   assert.match(cloudSource, /showConflict\(local\.raw, cloudData, local\.ownerUid\)/);
   assert.match(cloudSource, /pending\.localOwnerUid && pending\.localOwnerUid !== pending\.uid/);
   assert.match(cloudSource, /cannot be uploaded to this account/);
@@ -172,11 +172,13 @@ test('local career ownership prevents silent upload to a different signed-in acc
 });
 
 test('new cloud accounts initialize local ownership before the first gameplay save', () => {
-  const noCloudBranch = cloudSource.indexOf('if (!snap.exists())');
-  const ownerSet = cloudSource.indexOf('localStorage.setItem(OWNER_KEY, user.uid);', noCloudBranch);
-  const readySet = cloudSource.indexOf('syncReady = true;', noCloudBranch);
-  assert.ok(noCloudBranch >= 0 && ownerSet > noCloudBranch && ownerSet < readySet,
+  const newAccountBranch = cloudSource.indexOf('if (!local && !cloud)');
+  const ownerSet = cloudSource.indexOf('localStorage.setItem(OWNER_KEY, user.uid);', newAccountBranch);
+  const readySet = cloudSource.indexOf('syncReady = true;', ownerSet);
+  assert.ok(newAccountBranch >= 0 && ownerSet > newAccountBranch && readySet > ownerSet,
     'Owner marker must be set before cloud sync is enabled for a new account');
+  const guestLinkBranch = cloudSource.indexOf('if (local && !cloud)');
+  assert.ok(guestLinkBranch > 0 && cloudSource.indexOf('localStorage.setItem(OWNER_KEY, user.uid);', guestLinkBranch) > guestLinkBranch);
 });
 
 test('malformed local save values are treated as invalid and never auto-restored over cloud', () => {
