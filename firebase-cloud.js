@@ -654,8 +654,10 @@ async function keepLocal() {
     if (pending.cloudData) {
       localStorage.setItem(`delwin_cloud_backup_${currentUser.uid}_${Date.now()}`, JSON.stringify(pending.cloudData));
     }
-    await writeCloud(JSON.parse(pending.localRaw), pending.uid, cloudRevision);
+    const selectedLocalPayload = JSON.parse(pending.localRaw);
+    await writeCloud(selectedLocalPayload, pending.uid, cloudRevision);
     if (!currentUser || currentUser.uid !== pending.uid) return;
+    clearDurableOutboxIfMatches(pending.uid, selectedLocalPayload);
     localStorage.setItem(OWNER_KEY, pending.uid);
     localStorage.setItem(LOCAL_REVISION_KEY, String(cloudRevision));
     syncReady = true;
