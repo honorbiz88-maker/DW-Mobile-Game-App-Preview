@@ -309,6 +309,14 @@ function readSyncedBaseline() {
     return value && typeof value === "object" && !Array.isArray(value) ? value : null;
   } catch { return null; }
 }
+function queueMergedUpload(payload) {
+  if (!currentUser) return;
+  pendingPayload = { uid: currentUser.uid, payload: JSON.parse(JSON.stringify(payload)), checkpoint: { type: "auto-merge" } };
+  syncReady = true;
+  clearTimeout(syncTimer);
+  const uid = currentUser.uid;
+  syncTimer = setTimeout(() => flushPendingSave(uid), 300);
+}
 function applyMergedCareer(payload, revision, cloudData) {
   cloudRevision = revision;
   const apply = window.DelWinApplyCloudSave;
@@ -316,15 +324,12 @@ function applyMergedCareer(payload, revision, cloudData) {
     deferredCloudUpdate = null;
     localStorage.setItem(LOCAL_REVISION_KEY, String(revision));
     status("Career changes from both devices were safely combined.");
+    queueMergedUpload(payload);
   } else {
     deferredCloudUpdate = { ...cloudData, revision, mergedPayload: payload };
+    syncReady = true;
     status("Changes from both devices were combined and will appear at the next safe gameplay checkpoint.");
   }
-  pendingPayload = { uid: currentUser.uid, payload: JSON.parse(JSON.stringify(payload)), checkpoint: { type: "auto-merge" } };
-  syncReady = true;
-  clearTimeout(syncTimer);
-  const uid = currentUser.uid;
-  syncTimer = setTimeout(() => flushPendingSave(uid), 300);
 }
 function tryMergeConcurrentCareer(cloud, local) {
   const baseline = readSyncedBaseline();
@@ -359,6 +364,7 @@ function processDeferredCloudUpdate() {
       deferredCloudUpdate = null;
       localStorage.setItem(LOCAL_REVISION_KEY, String(cloud.revision || 0));
       status("Combined career changes are now active.");
+      queueMergedUpload(cloud.mergedPayload);
     }
     return;
   }
