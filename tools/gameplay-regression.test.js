@@ -1612,21 +1612,32 @@ test('failed initial account backup remains queued and retries after reconnect',
   assert.deepEqual(JSON.parse(JSON.stringify(h.cloudDocs.get('users/account-new/saves/current').payload)), career);
 });
 
-test('signing into a different account preserves the established local career', async () => {
+test('signing into another account archives the old career and loads the incoming account cloud save', async () => {
   const localCareer = { cash: 900, jobsCompleted: 25 };
   const cloudCareer = { cash: 120, jobsCompleted: 4 };
   const h = cloudModuleHarness({
-    local: { delwin_v4_save: JSON.stringify(localCareer), delwin_cloud_owner_uid: 'account-A' },
-    cloud: { 'users/account-B/saves/current': { schemaVersion: 1, payload: cloudCareer, updatedAt: {}, deviceId: 'other-device' } },
+    local: { delwin_v4_save: JSON.stringify(localCareer), delwin_cloud_owner_uid: 'account-A', delwin_cloud_revision: '6' },
+    cloud: { 'users/account-B/saves/current': { schemaVersion: 1, revision: 3, payload: cloudCareer, updatedAt: {}, deviceId: 'other-device' } },
     user: { uid: 'account-B', email: 'b@example.com' }
   });
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(h.calls.writes.length, 0);
-  assert.match(h.calls.modal, /Device progress protected/);
-  assert.doesNotMatch(h.calls.modal, /RESTORE CLOUD CAREER|KEEP DEVICE SAVE AND BACK UP/);
-  assert.deepEqual(JSON.parse(h.store.get('delwin_v4_save')), localCareer);
-  assert.equal(h.store.get('delwin_cloud_owner_uid'), 'account-A');
-  assert.equal(h.calls.reloads, 0);
+  assert.equal(h.calls.reloads, 1, 'account switching reloads to prevent stale in-memory career state');
+  assert.equal(h.store.get('delwin_account_account-A_career'), JSON.stringify(localCareer));
+  assert.equal(h.store.get('delwin_account_account-A_revision'), '6');
+  assert.equal(h.store.has('delwin_v4_save'), false, 'the old account career must not remain in the active slot');
+  assert.equal(h.store.has('delwin_cloud_owner_uid'), false);
+  assert.equal(h.calls.modal, '');
+
+  // The fresh page now has no active local career. It may safely restore B's cloud career.
+  const next = cloudModuleHarness({
+    cloud: { 'users/account-B/saves/current': { schemaVersion: 1, revision: 3, payload: cloudCareer, updatedAt: {}, deviceId: 'other-device' } },
+    user: { uid: 'account-B', email: 'b@example.com' }
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(JSON.parse(next.store.get('delwin_v4_save')), cloudCareer);
+  assert.equal(next.store.get('delwin_cloud_owner_uid'), 'account-B');
+  assert.equal(next.calls.reloads, 1);
 });
 
 test('restore marker blocks startup writes until a deliberately selected restore is reconciled', () => {
