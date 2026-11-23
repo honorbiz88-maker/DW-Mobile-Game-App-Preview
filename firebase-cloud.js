@@ -4,7 +4,7 @@ import {
   signInWithEmailAndPassword, sendPasswordResetEmail, signOut
 } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-auth.js";
 import {
-  getFirestore, doc, getDoc, setDoc, serverTimestamp
+  getFirestore, doc, getDoc, runTransaction, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -25,6 +25,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 let currentUser = null;
 let syncReady = false;
+let cloudRevision = 0;
 let reconciliationRetryPending = false;
 let syncTimer = null;
 let pendingPayload = null;
@@ -137,10 +138,11 @@ function backupLocal(raw, suffix = "before-cloud-change") {
   localStorage.setItem(key, raw);
   return key;
 }
-function saveEnvelope(payload) {
+function saveEnvelope(payload, revision) {
   return {
     schemaVersion: SCHEMA_VERSION,
     payload,
+    revision,
     updatedAt: serverTimestamp(),
     deviceId: getDeviceId()
   };
@@ -172,12 +174,28 @@ function showConflict(localRaw, cloudData, localOwnerUid = currentUser?.uid || n
   `);
   window.DelWinCloud.pendingConflict = { localRaw, cloudData, uid: currentUser?.uid || null, localOwnerUid };
 }
-async function writeCloud(payload, expectedUid = currentUser?.uid) {
+async function writeCloud(payload, expectedUid = currentUser?.uid, expectedRevision = cloudRevision) {
   if (!expectedUid || !currentUser || currentUser.uid !== expectedUid) {
     throw new Error("Account changed before the save could sync. Your local career is safe.");
   }
   const ref = doc(db, "users", expectedUid, "saves", "current");
-  await setDoc(ref, saveEnvelope(payload));
+  const nextRevision = expectedRevision + 1;
+  await runTransaction(db, async transaction => {
+    const snap = await transaction.get(ref);
+    const data = snap.exists() ? snap.data() : null;
+    const actualRevision = Number.isSafeInteger(data?.revision) ? data.revision : 0;
+    if (actualRevision !== expectedRevision) {
+      const conflict = new Error("A newer cloud career was saved on another device. Your local progress has been kept; choose which career to keep.");
+      conflict.code = "save/revision-conflict";
+      throw conflict;
+    }
+    if (!currentUser || currentUser.uid !== expectedUid) {
+      throw new Error("Account changed before the save could sync. Your local career is safe.");
+    }
+    transaction.set(ref, saveEnvelope(payload, nextRevision));
+  });
+  if (currentUser?.uid === expectedUid) cloudRevision = nextRevision;
+  return nextRevision;
 }
 async function reconcile(user) {
   if (reconcilingUids.has(user.uid)) return;
@@ -240,6 +258,7 @@ async function reconcile(user) {
     }
 
     const cloud = snap.exists() ? snap.data() : null;
+    cloudRevision = Number.isSafeInteger(cloud?.revision) ? cloud.revision : 0;
     if (cloud && (cloud.schemaVersion !== SCHEMA_VERSION || !cloud.payload || typeof cloud.payload !== "object" || Array.isArray(cloud.payload))) {
       status("The cloud save format is not recognized. Nothing was overwritten; ask for help before proceeding.", true);
       return;
@@ -252,7 +271,7 @@ async function reconcile(user) {
       if (!cloud) {
         // Recover a missing cloud document from the already-linked local career.
         // This is a one-time background seed, never a save-selection prompt.
-        await writeCloud(local.payload, user.uid);
+        await writeCloud(local.payload, user.uid, cloudRevision);
         if (!currentUser || currentUser.uid !== user.uid) return;
         status("Cloud backup reconnected from this device's saved career.");
       } else {
@@ -316,7 +335,7 @@ async function keepLocal() {
     if (pending.cloudData) {
       localStorage.setItem(`delwin_cloud_backup_${currentUser.uid}_${Date.now()}`, JSON.stringify(pending.cloudData));
     }
-    await writeCloud(JSON.parse(pending.localRaw), pending.uid);
+    await writeCloud(JSON.parse(pending.localRaw), pending.uid, cloudRevision);
     if (!currentUser || currentUser.uid !== pending.uid) return;
     localStorage.setItem(OWNER_KEY, pending.uid);
     syncReady = true;
@@ -375,7 +394,23 @@ async function flushPendingSave(expectedUid) {
       status("Cloud save synced.");
     }
   } catch (error) {
-    if (currentUser?.uid === expectedUid && syncReady) {
+    if (error.code === "save/revision-conflict" && currentUser?.uid === expectedUid) {
+      // Stop automatic writes and present both copies. A player must explicitly
+      // choose; an older/offline device can never silently replace newer cloud progress.
+      syncReady = false;
+      pendingPayload = null;
+      try {
+        const latest = await getDoc(doc(db, "users", expectedUid, "saves", "current"));
+        if (currentUser?.uid !== expectedUid) return;
+        const cloudData = latest.exists() ? latest.data() : null;
+        if (cloudData?.payload && typeof cloudData.payload === "object" && !Array.isArray(cloudData.payload)) {
+          cloudRevision = Number.isSafeInteger(cloudData.revision) ? cloudData.revision : 0;
+          const local = localSnapshot();
+          if (local && !local.invalid) showConflict(local.raw, cloudData, local.ownerUid);
+        }
+      } catch {}
+      status("A newer cloud career exists. Your device progress is safe; choose which career to keep before syncing again.", true);
+    } else if (currentUser?.uid === expectedUid && syncReady) {
       // Keep the newest queued state; otherwise retry the failed snapshot.
       if (!pendingBelongsToUser(pendingPayload, currentUser)) {
         pendingPayload = { uid: expectedUid, payload: next };
