@@ -1837,7 +1837,7 @@ test("background and page-hide lifecycle checkpoints preserve pending cloud work
   assert.ok(cloudSource.includes('window.addEventListener("pagehide"'));
   assert.ok(cloudSource.includes('window.saveState?.("app-background")'));
   assert.ok(cloudSource.includes('window.saveState?.("page-hide")'));
-  assert.ok(cloudSource.includes("function flushNow()"));
+  assert.ok(cloudSource.includes("async function flushNow(maxWaitMs = 3500)"));
   assert.ok(cloudSource.includes("queueSave, flushNow, keepLocal"));
 });
 
