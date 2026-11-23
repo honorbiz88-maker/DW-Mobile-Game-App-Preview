@@ -24,6 +24,7 @@ const SYNCED_SNAPSHOT_KEY = "delwin_cloud_synced_snapshot";
 const SESSION_KEY = "delwin_session_id";
 const SESSION_STARTED_KEY = "delwin_session_started_at";
 const RESTORE_MARKER_KEY = "delwin_cloud_restore_pending";
+const OUTBOX_KEY = "delwin_cloud_pending_outbox_v1";
 const SCHEMA_VERSION = 1;
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -323,8 +324,54 @@ function readSyncedBaseline() {
     return value && typeof value === "object" && !Array.isArray(value) ? value : null;
   } catch { return null; }
 }
+function readDurableOutbox() {
+  try {
+    const value = JSON.parse(localStorage.getItem(OUTBOX_KEY) || "null");
+    return value && typeof value === "object" && typeof value.uid === "string" && value.payload && typeof value.payload === "object" && !Array.isArray(value.payload)
+      ? value : null;
+  } catch { return null; }
+}
+function persistDurableOutbox(uid, payload, checkpointType = "gameplay") {
+  if (!uid || !payload || typeof payload !== "object" || Array.isArray(payload)) return false;
+  try {
+    localStorage.setItem(OUTBOX_KEY, JSON.stringify({
+      uid, payload, checkpointType, queuedAt: Date.now()
+    }));
+    return true;
+  } catch (error) {
+    status("Your device save is current, but its cloud backup queue could not be stored: " + error.message, true);
+    return false;
+  }
+}
+function clearDurableOutboxIfMatches(uid, payload) {
+  const queued = readDurableOutbox();
+  if (queued?.uid === uid && sameValue(queued.payload, payload)) {
+    localStorage.removeItem(OUTBOX_KEY);
+  }
+}
+function activateDurableOutbox(uid) {
+  if (!currentUser || currentUser.uid !== uid || !syncReady) return;
+  const local = localSnapshot();
+  if (!local || local.invalid || local.ownerUid !== uid) return;
+  const baseline = readSyncedBaseline();
+  if (baseline && sameValue(local.payload, baseline)) {
+    const queued = readDurableOutbox();
+    if (queued?.uid === uid) localStorage.removeItem(OUTBOX_KEY);
+    return;
+  }
+  // The local career is authoritative. Rebuild the durable outbox from it
+  // instead of trusting a possibly stale in-memory timer or old queue entry.
+  persistDurableOutbox(uid, local.payload, "recovered-local-outbox");
+  pendingPayload = {
+    uid, payload: JSON.parse(JSON.stringify(local.payload)),
+    checkpoint: { type: "recovered-local-outbox" }
+  };
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => flushPendingSave(uid), 300);
+}
 function queueMergedUpload(payload) {
   if (!currentUser) return;
+  persistDurableOutbox(currentUser.uid, payload, "auto-merge");
   pendingPayload = { uid: currentUser.uid, payload: JSON.parse(JSON.stringify(payload)), checkpoint: { type: "auto-merge" } };
   syncReady = true;
   clearTimeout(syncTimer);
@@ -588,7 +635,10 @@ async function reconcile(user) {
   } finally {
     if (currentUser?.uid === user.uid) {
       busy = false;
-      if (syncReady) watchCloud(user);
+      if (syncReady) {
+        activateDurableOutbox(user.uid);
+        watchCloud(user);
+      }
     }
     reconcilingUids.delete(user.uid);
   }
@@ -639,6 +689,7 @@ async function flushPendingSave(expectedUid) {
       let restoreMarker = null;
       try { restoreMarker = JSON.parse(localStorage.getItem(RESTORE_MARKER_KEY) || "null"); } catch {}
       if (restoreMarker?.uid === expectedUid) localStorage.removeItem(RESTORE_MARKER_KEY);
+      clearDurableOutboxIfMatches(expectedUid, next);
       status("Cloud save synced.");
     }
   } catch (error) {
@@ -689,7 +740,13 @@ async function flushPendingSave(expectedUid) {
   }
 }
 function queueSave(payload, metadata = {}) {
-  if (!currentUser || !syncReady) return;
+  const ownerUid = currentUser?.uid || localStorage.getItem(OWNER_KEY);
+  if (!ownerUid || (currentUser && localStorage.getItem(OWNER_KEY) !== currentUser.uid)) return;
+  const checkpointType = metadata.checkpointType || "gameplay";
+  // Persist the upload intent before starting any network work. A reload or
+  // offline period must not erase the fact that this local save needs backup.
+  persistDurableOutbox(ownerUid, payload, checkpointType);
+  if (!currentUser || !syncReady || currentUser.uid !== ownerUid) return;
   let restoreMarker = null;
   try { restoreMarker = JSON.parse(localStorage.getItem(RESTORE_MARKER_KEY) || "null"); } catch {}
   if (restoreMarker?.uid === currentUser.uid) {
@@ -701,7 +758,7 @@ function queueSave(payload, metadata = {}) {
     return;
   }
   const queuedUid = currentUser.uid;
-  pendingPayload = { uid: queuedUid, payload: JSON.parse(JSON.stringify(payload)), checkpoint: { type: metadata.checkpointType || "gameplay" } };
+  pendingPayload = { uid: queuedUid, payload: JSON.parse(JSON.stringify(payload)), checkpoint: { type: checkpointType } };
   clearTimeout(syncTimer);
   syncTimer = setTimeout(() => flushPendingSave(queuedUid), 1400);
 }
