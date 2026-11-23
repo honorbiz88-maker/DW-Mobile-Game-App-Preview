@@ -1848,3 +1848,13 @@ test("account changes wait briefly for cloud acknowledgement without blocking of
   assert.ok(cloudSource.includes('saveState?.("account-switch")'));
   assert.ok(cloudSource.includes("if (!currentUser || !syncReady || !navigator.onLine) return false"));
 });
+
+test("completed contract claim action remains prominent on mobile", () => {
+  const render = extractFunction("renderContractBanner");
+  assert.match(render, /REWARD READY — CLAIM IT TO UNLOCK YOUR NEXT CONTRACT/);
+  assert.match(render, /CLAIM REWARD · UNLOCK NEXT CONTRACT/);
+  assert.match(render, /min-height:48px/);
+  assert.match(render, /width:100%/);
+  assert.match(render, /role="status" aria-live="polite"/);
+  assert.match(render, /ready\s*\?/);
+});
