@@ -1840,3 +1840,11 @@ test("background and page-hide lifecycle checkpoints preserve pending cloud work
   assert.ok(cloudSource.includes("function flushNow()"));
   assert.ok(cloudSource.includes("queueSave, flushNow, keepLocal"));
 });
+
+test("account changes wait briefly for cloud acknowledgement without blocking offline sign-in", () => {
+  assert.ok(cloudSource.includes("async function flushNow(maxWaitMs = 3500)"));
+  assert.ok(cloudSource.includes("while (writing && currentUser?.uid === uid"));
+  assert.ok(cloudSource.includes('await window.DelWinCloud?.flushNow?.();'));
+  assert.ok(cloudSource.includes('saveState?.("account-switch")'));
+  assert.ok(cloudSource.includes("if (!currentUser || !syncReady || !navigator.onLine) return false"));
+});
