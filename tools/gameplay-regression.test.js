@@ -1708,19 +1708,18 @@ test('mobile interaction targets, viewport, and touch cancellation safeguards st
     'Reduced-motion preferences must be respected');
 });
 
-test('linked devices detect newer cloud revisions and protect both careers', () => {
+test('linked devices observe cloud revisions and protect both careers on true conflicts', () => {
   assert.match(cloudSource, /onSnapshot, runTransaction/);
-  assert.match(cloudSource, /function watchCloud\(user\)/);
-  assert.match(cloudSource, /revision > localRevision && JSON\.stringify\(local\.payload\) !== JSON\.stringify\(cloud\.payload\)/);
-  assert.match(cloudSource, /showConflict\(local\.raw, cloud, local\.ownerUid\)/);
-  assert.match(cloudSource, /syncReady = false;[\s\S]*?pendingPayload = null;[\s\S]*?cloudRevision = revision;/);
-  assert.match(cloudSource, /if \(syncReady\) watchCloud\(user\)/);
-  assert.match(cloudSource, /cloudWatchUnsubscribe\?\.\(\)/);
+  assert.match(cloudSource, /function watchCloud\\(user\\)/);
+  assert.match(cloudSource, /revision <= lastObservedCloudRevision/);
+  assert.match(cloudSource, /showConflict\\(local\\.raw, cloud, local\\.ownerUid\\)/);
+  assert.match(cloudSource, /save\\/revision-conflict/);
+  assert.match(cloudSource, /cloudWatchUnsubscribe\\?\\.\\(\\)/);
 });
 
-test('each device tracks the cloud revision it has accepted', () => {
+test('each device records the cloud revision acknowledged by compare-and-set', () => {
   assert.match(cloudSource, /const LOCAL_REVISION_KEY = "delwin_cloud_revision"/);
-  assert.match(cloudSource, /localStorage\.setItem\(LOCAL_REVISION_KEY, String\(nextRevision\)\)/);
-  assert.match(cloudSource, /cloudRevisionOnServer > localRevision/);
-  assert.match(cloudSource, /localStorage\.setItem\(LOCAL_REVISION_KEY, String\(Number\.isSafeInteger\(pending\.cloudData\.revision\)/);
+  assert.match(cloudSource, /localStorage\\.setItem\\(LOCAL_REVISION_KEY, String\\(nextRevision\\)\\)/);
+  assert.match(cloudSource, /localStorage\\.setItem\\(LOCAL_REVISION_KEY, String\\(revision\\)\\)/);
+  assert.match(cloudSource, /localStorage\\.setItem\\(SYNCED_SNAPSHOT_KEY, JSON\\.stringify\\(payload\\)\\)/);
 });
