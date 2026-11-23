@@ -204,6 +204,90 @@
     </div>
   </div>
 
+  <div id="save-tab-lock" class="save-tab-lock" hidden role="dialog" aria-modal="true" aria-labelledby="save-tab-lock-title">
+    <div class="save-tab-lock-card">
+      <div class="save-tab-lock-icon">🔒</div>
+      <h2 id="save-tab-lock-title">Career already open</h2>
+      <p>This career is active in another browser tab. To protect purchases, cash, equipment, and job progress, only one tab can control this save at a time.</p>
+      <p class="save-tab-lock-hint">Close the other game tab, then reload this page to take control. Your saved career will remain on this device.</p>
+      <button id="save-tab-lock-reload" type="button">RELOAD AND TRY AGAIN</button>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const overlay = document.getElementById("save-tab-lock");
+      const reloadButton = document.getElementById("save-tab-lock-reload");
+      const fallbackKey = "delwin_active_save_tab_v1";
+      const tabId = (window.crypto?.randomUUID?.() || ("tab-" + Date.now() + "-" + Math.random().toString(36).slice(2)));
+      let heartbeat = null;
+      window.__delwinWriterTab = false;
+
+      const block = () => {
+        window.__delwinWriterTab = false;
+        if (heartbeat) clearInterval(heartbeat);
+        if (overlay) overlay.hidden = false;
+      };
+      const enable = () => {
+        window.__delwinWriterTab = true;
+        if (overlay) overlay.hidden = true;
+        window.dispatchEvent(new Event("delwin-save-writer-ready"));
+      };
+      reloadButton?.addEventListener("click", () => window.location.reload());
+
+      if (navigator.locks?.request) {
+        navigator.locks.request("delwin-mobile-game-career-writer", { ifAvailable: true }, lock => {
+          if (!lock) {
+            block();
+            return;
+          }
+          enable();
+          return new Promise(resolve => window.addEventListener("pagehide", resolve, { once: true }));
+        }).catch(() => block());
+        return;
+      }
+
+      const readLease = () => {
+        try { return JSON.parse(localStorage.getItem(fallbackKey) || "null"); }
+        catch { return null; }
+      };
+      const writeLease = () => localStorage.setItem(fallbackKey, JSON.stringify({
+        id: tabId, expiresAt: Date.now() + 10000
+      }));
+      const claimLease = () => {
+        const current = readLease();
+        if (current?.id && current.id !== tabId && Number(current.expiresAt) > Date.now()) {
+          block();
+          return false;
+        }
+        writeLease();
+        if (readLease()?.id !== tabId) {
+          block();
+          return false;
+        }
+        enable();
+        heartbeat = setInterval(() => {
+          const latest = readLease();
+          if (latest?.id !== tabId) {
+            block();
+            return;
+          }
+          writeLease();
+        }, 3000);
+        return true;
+      };
+      claimLease();
+      window.addEventListener("storage", event => {
+        if (event.key !== fallbackKey) return;
+        const latest = readLease();
+        if (latest?.id && latest.id !== tabId && Number(latest.expiresAt) > Date.now()) block();
+      });
+      window.addEventListener("pagehide", () => {
+        if (heartbeat) clearInterval(heartbeat);
+        if (readLease()?.id === tabId) localStorage.removeItem(fallbackKey);
+      }, { once: true });
+    })();
+  </script>
   <script src="game.js"></script>
   <script type="module" src="firebase-cloud.js"></script>
 </body>
