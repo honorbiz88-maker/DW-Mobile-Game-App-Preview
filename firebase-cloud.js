@@ -234,19 +234,18 @@ function getDeviceId() {
 function showConflict(localRaw, cloudData, localOwnerUid = currentUser?.uid || null) {
   const open = window.openModal;
   if (typeof open !== "function") {
-    status("A local and cloud career both exist. Open the menu again to resolve the save conflict.", true);
+    status("Your device save is preserved. Open the account menu to resolve synchronization.", true);
     return;
   }
   const date = cloudData.updatedAt?.toDate ? cloudData.updatedAt.toDate().toLocaleString() : "date unavailable";
   open(`
-    <span class="badge">SAVE CONFLICT</span>
-    <h3>Two career saves found</h3>
-    <p style="font-size:12px;color:var(--muted);">This device has a local career and your account has a different cloud career (last cloud update: ${date}). Neither copy has been changed.</p>
+    <span class="badge">SAVE SYNC</span>
+    <h3>Device progress protected</h3>
+    <p style="font-size:12px;color:var(--muted);">This device has a career that differs from the account backup (last cloud update: ${date}). Your device career remains the active save. The cloud copy will be preserved before syncing.</p>
     ${localOwnerUid && currentUser?.uid && localOwnerUid !== currentUser.uid
-      ? '<p style="font-size:12px;color:var(--muted);">This device career is linked to a different account. It cannot be uploaded to the account currently signed in.</p>'
-      : '<button class="primary-btn" onclick="window.DelWinCloud.keepLocal()">KEEP THIS DEVICE\'S CAREER</button>'}
-    <button class="secondary-btn" onclick="window.DelWinCloud.keepCloud()">RESTORE CLOUD CAREER</button>
-    <p style="font-size:10px;color:var(--muted);">The device career will be backed up on this device before the cloud career replaces it.</p>
+      ? '<p style="font-size:12px;color:var(--muted);">This device career belongs to a different account and will not be uploaded to the account currently signed in.</p>'
+      : '<button class="primary-btn" onclick="window.DelWinCloud.keepLocal()">KEEP DEVICE SAVE AND BACK UP</button>'}
+    <p style="font-size:10px;color:var(--muted);">Cloud restoration is reserved for a new device without an established local career. An older cloud timestamp will never replace an established device career.</p>
   `);
   window.DelWinCloud.pendingConflict = { localRaw, cloudData, uid: currentUser?.uid || null, localOwnerUid };
 }
@@ -617,31 +616,7 @@ async function keepLocal() {
     status(`Could not keep the local career: ${error.message}`, true);
   }
 }
-function keepCloud() {
-  const pending = window.DelWinCloud.pendingConflict;
-  if (!pending || !currentUser || pending.uid !== currentUser.uid) return;
-  try {
-    backupLocal(pending.localRaw);
-    const cloudRevision = pending.cloudData.updatedAt?.toMillis ? pending.cloudData.updatedAt.toMillis() : null;
-    // The restore decision is bound to the exact cloud payload, so it survives
-    // reloads even when a legacy/migrated Firestore document has no Timestamp.
-    localStorage.setItem(RESTORE_MARKER_KEY, JSON.stringify({
-      uid: currentUser.uid,
-      revision: cloudRevision,
-      deviceId: getDeviceId(),
-      cloudPayload: pending.cloudData.payload
-    }));
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(pending.cloudData.payload));
-    localStorage.setItem(OWNER_KEY, currentUser.uid);
-    localStorage.setItem(LOCAL_REVISION_KEY, String(Number.isSafeInteger(pending.cloudData.revision) ? pending.cloudData.revision : cloudRevision));
-    window.DelWinCloud.pendingConflict = null;
-    syncReady = true;
-    window.closeModal?.();
-    location.reload();
-  } catch (error) {
-    status(`Could not restore cloud career: ${error.message}`, true);
-  }
-}
+
 function pendingBelongsToUser(pending, user) {
   return !!pending && !!user && pending.uid === user.uid;
 }
@@ -740,7 +715,7 @@ function isRestorePending() {
     return false;
   }
 }
-window.DelWinCloud = { queueSave, keepLocal, keepCloud, onSafeCheckpoint: processDeferredCloudUpdate, signOut: () => signOut(auth), hasAccount: () => !!currentUser, isRestorePending, pendingConflict: null };
+window.DelWinCloud = { queueSave, keepLocal, onSafeCheckpoint: processDeferredCloudUpdate, signOut: () => signOut(auth), hasAccount: () => !!currentUser, isRestorePending, pendingConflict: null };
 window.addEventListener("online", () => {
   if (!currentUser || !navigator.onLine) return;
   // Retry only an authentication setup that previously failed. Healthy
