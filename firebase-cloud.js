@@ -57,13 +57,10 @@ let busy = false;
 let writing = false;
 const reconcilingUids = new Set();
 
-function setSyncState(state, detail = "") {
-  const el = document.getElementById("cloud-sync-indicator");
-  if (!el) return;
-  const labels = { local: "SAVED LOCALLY", syncing: "SYNCING TO CLOUD", synced: "CLOUD SYNCED", pending: "OFFLINE — SYNC PENDING", checking: "CHECKING CLOUD BACKUP", conflict: "SYNC PAUSED — REVIEW NEEDED", guest: "DEVICE SAVE ACTIVE" };
-  el.textContent = detail ? labels[state] + " · " + detail : (labels[state] || state);
-  el.dataset.syncState = state;
-  el.style.color = state === "synced" ? "#86efac" : state === "conflict" ? "#fca5a5" : "var(--muted)";
+let internalSyncState = "guest";
+function setSyncState(state) {
+  // Sync is an internal service, not a gameplay interruption.
+  internalSyncState = state;
 }
 function status(message, error = false) {
   const el = document.getElementById("cloud-account-status");
@@ -777,7 +774,7 @@ async function flushPendingSave(expectedUid) {
   if (writing) return;
   if (!pendingBelongsToUser(pendingPayload, currentUser) || currentUser.uid !== expectedUid || !syncReady || !navigator.onLine) return;
   if (busy) {
-    syncTimer = setTimeout(() => flushPendingSave(expectedUid), 1400);
+    syncTimer = setTimeout(() => flushPendingSave(expectedUid), 250);
     return;
   }
   writing = true;
@@ -786,7 +783,7 @@ async function flushPendingSave(expectedUid) {
   const checkpoint = pendingPayload.checkpoint || {};
   pendingPayload = null;
   syncTimer = null;
-  let retryDelay = 1400;
+  let retryDelay = 250;
   try {
     await writeCloud(next, expectedUid, cloudRevision, checkpoint);
     if (currentUser?.uid === expectedUid) {
@@ -866,7 +863,12 @@ function queueSave(payload, metadata = {}) {
   const queuedUid = currentUser.uid;
   pendingPayload = { uid: queuedUid, payload: JSON.parse(JSON.stringify(payload)), checkpoint: { type: checkpointType } };
   clearTimeout(syncTimer);
-  syncTimer = setTimeout(() => flushPendingSave(queuedUid), 1400);
+  // Critical progress checkpoints start cloud sync immediately after the
+  // synchronous local write. Ordinary gameplay saves are coalesced briefly
+  // to avoid a Firestore transaction for every rapid state update.
+  const immediateCheckpoints = new Set(["purchase", "job-complete", "upgrade", "milestone", "account-switch", "account-link", "session-end", "session-background", "app-background", "page-hide"]);
+  const delay = immediateCheckpoints.has(checkpointType) ? 0 : 250;
+  syncTimer = setTimeout(() => flushPendingSave(queuedUid), delay);
 }
 function flushNow() {
   clearTimeout(syncTimer);
