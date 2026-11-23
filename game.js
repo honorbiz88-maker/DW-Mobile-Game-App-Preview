@@ -307,7 +307,12 @@ function saveState(checkpointType = 'gameplay') {
     if (window.DelWinCloud && typeof window.DelWinCloud.queueSave === 'function') {
       window.DelWinCloud.queueSave(state, { checkpointType });
     }
-  } catch (e) {}
+  } catch (e) {
+    // A failed local write is a gameplay-critical error. Never silently hide it:
+    // purchases and career changes must not appear safely saved when storage failed.
+    try { window.DelWinCloud?.reportLocalSaveError?.(e); } catch {}
+    console.error("DelWin local career save failed", e);
+  }
 }
 
 // Cloud updates may be applied in-place only at a safe gameplay boundary.
