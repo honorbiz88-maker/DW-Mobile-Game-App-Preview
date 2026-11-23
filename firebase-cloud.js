@@ -868,6 +868,12 @@ function queueSave(payload, metadata = {}) {
   clearTimeout(syncTimer);
   syncTimer = setTimeout(() => flushPendingSave(queuedUid), 1400);
 }
+function flushNow() {
+  clearTimeout(syncTimer);
+  syncTimer = null;
+  if (!currentUser || !syncReady || !navigator.onLine) return Promise.resolve(false);
+  return flushPendingSave(currentUser.uid);
+}
 function isRestorePending() {
   try {
     const marker = JSON.parse(localStorage.getItem(RESTORE_MARKER_KEY) || "null");
@@ -879,7 +885,7 @@ function isRestorePending() {
   }
 }
 window.DelWinCloud = {
-  queueSave, keepLocal, onSafeCheckpoint: processDeferredCloudUpdate,
+  queueSave, flushNow, keepLocal, onSafeCheckpoint: processDeferredCloudUpdate,
   signOut: () => signOut(auth), hasAccount: () => !!currentUser, isRestorePending,
   reportLocalSaveError(error) {
     const detail = error?.message || "browser storage is unavailable";
@@ -887,6 +893,21 @@ window.DelWinCloud = {
   },
   pendingConflict: null
 };
+// Lifecycle checkpoints are local-first. The durable outbox is written
+// synchronously; the network flush is best-effort because browsers may suspend
+// a page immediately after pagehide.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    try { window.saveState?.("app-background"); } catch {}
+    void flushNow();
+  } else if (document.visibilityState === "visible") {
+    void flushNow();
+  }
+});
+window.addEventListener("pagehide", () => {
+  try { window.saveState?.("page-hide"); } catch {}
+  void flushNow();
+});
 window.addEventListener("offline", () => { if (currentUser) setSyncState("pending"); });
 window.addEventListener("online", () => {
   if (currentUser) setSyncState("local", "connection restored; checking backup");
