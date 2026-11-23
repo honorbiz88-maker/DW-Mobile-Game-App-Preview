@@ -1831,3 +1831,12 @@ test("cloud sync indicator distinguishes device save from confirmed cloud backup
   assert.ok(cloudSource.includes("CLOUD SYNCED"));
   assert.ok(fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8").includes('id="cloud-sync-indicator"'));
 });
+
+test("background and page-hide lifecycle checkpoints preserve pending cloud work", () => {
+  assert.ok(cloudSource.includes('document.addEventListener("visibilitychange"'));
+  assert.ok(cloudSource.includes('window.addEventListener("pagehide"'));
+  assert.ok(cloudSource.includes('window.saveState?.("app-background")'));
+  assert.ok(cloudSource.includes('window.saveState?.("page-hide")'));
+  assert.ok(cloudSource.includes("function flushNow()"));
+  assert.ok(cloudSource.includes("queueSave, flushNow, keepLocal"));
+});
