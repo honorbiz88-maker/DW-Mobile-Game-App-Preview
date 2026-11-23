@@ -25,6 +25,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 let currentUser = null;
 let syncReady = false;
+let reconciliationRetryPending = false;
 let syncTimer = null;
 let pendingPayload = null;
 let busy = false;
@@ -182,6 +183,7 @@ async function reconcile(user) {
   if (reconcilingUids.has(user.uid)) return;
   reconcilingUids.add(user.uid);
   syncReady = false;
+  reconciliationRetryPending = false;
   busy = true;
   status("Connecting cloud backup…");
   try {
@@ -263,9 +265,11 @@ async function reconcile(user) {
     // Account creation on a device with an existing guest career: link and back
     // up that career when this account has no cloud save yet.
     if (local && !cloud) {
+      // Claim the guest career before the first network write. If the request
+      // fails or the account changes mid-flight, another account cannot adopt it.
+      localStorage.setItem(OWNER_KEY, user.uid);
       await writeCloud(local.payload, user.uid);
       if (!currentUser || currentUser.uid !== user.uid) return;
-      localStorage.setItem(OWNER_KEY, user.uid);
       syncReady = true;
       status("Your existing device career is now backed up to your account.");
       return;
@@ -294,6 +298,7 @@ async function reconcile(user) {
     syncReady = true;
     status("Account connected. Your career will sync after your first save.");
   } catch (error) {
+    if (currentUser?.uid === user.uid) reconciliationRetryPending = true;
     status(`Cloud connection failed: ${error.message}. Your local career remains available.`, true);
   } finally {
     if (currentUser?.uid === user.uid) busy = false;
@@ -418,9 +423,13 @@ function isRestorePending() {
 }
 window.DelWinCloud = { queueSave, keepLocal, keepCloud, signOut: () => signOut(auth), hasAccount: () => !!currentUser, isRestorePending, pendingConflict: null };
 window.addEventListener("online", () => {
-  // Reconnection only resumes the queued background write. Authentication
-  // reconciliation runs once when auth state changes, never on network events.
-  if (!currentUser || !syncReady || !navigator.onLine) return;
+  if (!currentUser || !navigator.onLine) return;
+  // Retry only an authentication setup that previously failed. Healthy
+  // sessions never re-read Firestore or re-run save selection on reconnect.
+  if (!syncReady) {
+    if (reconciliationRetryPending && !busy) void reconcile(currentUser);
+    return;
+  }
   const uid = currentUser.uid;
   clearTimeout(syncTimer);
   syncTimer = null;
@@ -437,6 +446,7 @@ onAuthStateChanged(auth, user => {
       pendingPayload = null;
       window.DelWinCloud && (window.DelWinCloud.pendingConflict = null);
       busy = false;
+      reconciliationRetryPending = false;
     }
     currentUser = user;
     syncReady = false;
