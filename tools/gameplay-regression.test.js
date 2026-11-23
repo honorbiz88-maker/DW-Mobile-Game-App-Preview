@@ -1482,7 +1482,7 @@ function cloudModuleHarness({ local = {}, cloud = {}, user = null, online = true
   const elementIds = [
     'cloud-account-card', 'cloud-create', 'cloud-signin', 'cloud-reset', 'cloud-signout',
     'cloud-email', 'cloud-password', 'cloud-account-status', 'cloud-signed-out',
-    'cloud-signed-in', 'cloud-user-email'
+    'cloud-signed-in', 'cloud-user-email', 'cloud-sync-indicator'
   ];
   for (const id of elementIds) {
     elements.set(id, {
@@ -1490,7 +1490,7 @@ function cloudModuleHarness({ local = {}, cloud = {}, user = null, online = true
       addEventListener(type, callback) { calls.listeners[id + ':' + type] = callback; }
     });
   }
-  const document = { getElementById: id => elements.get(id) || null };
+  const document = { getElementById: id => elements.get(id) || null, addEventListener(type, callback) { calls.documentListeners ||= {}; calls.documentListeners[type] = callback; }, visibilityState: 'visible' };
   const localStorage = {
     getItem: key => store.has(key) ? store.get(key) : null,
     setItem: (key, value) => store.set(key, String(value)),
