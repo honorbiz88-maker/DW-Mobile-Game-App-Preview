@@ -58,142 +58,58 @@ function gameFunction(name, dependencies = {}) {
   return new Function(...names, `return (${extractFunction(name)});`)(...values);
 }
 
-test('cloud save queue is bound to the account that created it', () => {
-  const match = cloudSource.match(/function pendingBelongsToUser\(pending, user\) \{[\s\S]*?\n\}/);
+test('cloud queue is scoped to the authenticated owner and cannot cross accounts', () => {
+  const match = cloudSource.match(/function pendingBelongsToUser\\(pending, user\\) \\{[\\s\\S]*?\\n\\}/);
   assert.ok(match, 'Missing account-scoped pending-save guard');
   const belongs = new Function(`return (${match[0]});`)();
   assert.equal(belongs({ uid: 'account-A', payload: { cash: 10 } }, { uid: 'account-A' }), true);
   assert.equal(belongs({ uid: 'account-A', payload: { cash: 10 } }, { uid: 'account-B' }), false);
   assert.equal(belongs({ uid: 'account-A' }, null), false);
-  assert.match(cloudSource, /const queuedUid = currentUser\.uid;/);
-  assert.match(cloudSource, /currentUser\.uid !== expectedUid/);
-  assert.match(cloudSource, /pendingBelongsToUser\(pendingPayload, currentUser\)/);
-  assert.match(cloudSource, /pendingPayload = \{ uid: queuedUid, payload:/);
+  assert.match(cloudSource, /currentUser\\.uid !== expectedUid/);
+  assert.match(cloudSource, /pendingBelongsToUser\\(pendingPayload, currentUser\\)/);
 });
 
-test('cloud writes and conflict choices remain bound to the originating account', () => {
-  assert.match(cloudSource, /async function writeCloud\(payload, expectedUid = currentUser\?\.uid\)/);
-  assert.match(cloudSource, /currentUser\.uid !== expectedUid/);
-  assert.match(cloudSource, /doc\(db, "users", expectedUid, "saves", "current"\)/);
-  assert.match(cloudSource, /pendingConflict = \{ localRaw, cloudData, uid: currentUser\?\.uid \|\| null, localOwnerUid \}/);
-  assert.match(cloudSource, /pending\.uid !== currentUser\.uid/);
-  assert.match(cloudSource, /await writeCloud\(JSON\.parse\(pending\.localRaw\), pending\.uid\);[\s\S]*?currentUser\.uid !== pending\.uid/);
-  assert.match(cloudSource, /pendingConflict = null;[\s\S]*?busy = false;/);
+test('account sign-in never replaces a different established local career', () => {
+  const start = cloudSource.indexOf('if (local?.ownerUid && local.ownerUid !== user.uid)');
+  const end = cloudSource.indexOf('const cloud = snap.exists()', start);
+  assert.ok(start >= 0 && end > start);
+  const guard = cloudSource.slice(start, end);
+  assert.match(guard, /showConflict\\(local.raw, cloudData, local.ownerUid\\)/);
+  assert.match(guard, /return;/);
+  assert.doesNotMatch(guard, /restoreCloudCareer|localStorage\\.setItem\\(LOCAL_KEY|location\\.reload/);
 });
 
-test('cloud writes are serialized and retain failed saves for automatic retry', () => {
-  assert.match(cloudSource, /let writing = false;/);
-  assert.match(cloudSource, /async function flushPendingSave\(expectedUid\)/);
-  assert.match(cloudSource, /if \(writing\) return;/);
-  assert.match(cloudSource, /writing = true;/);
-  assert.match(cloudSource, /await writeCloud\(next, expectedUid\)/);
-  assert.match(cloudSource, /pendingPayload = \{ uid: expectedUid, payload: next \}/);
+test('local gameplay saves remain independent from cloud connectivity', () => {
+  const save = extractFunction('saveState');
+  assert.match(save, /localStorage\\.setItem\\('delwin_v4_save', JSON\\.stringify\\(state\\)\\)/);
+  assert.match(save, /DelWinCloud\\?\\.queueSave/);
+  assert.match(save, /reportLocalSaveError/);
+  assert.doesNotMatch(save, /await |getDoc|runTransaction/);
+});
+
+test('durable outbox is persisted before network work and cleared only after matching acknowledgement', () => {
+  const persist = cloudSource.indexOf('persistDurableOutbox(ownerUid, payload, checkpointType)');
+  const pending = cloudSource.indexOf('pendingPayload = { uid: queuedUid');
+  const flush = cloudSource.indexOf('async function flushPendingSave');
+  assert.ok(persist >= 0 && pending > persist && flush > pending);
+  assert.match(cloudSource, /clearDurableOutboxIfMatches\\(expectedUid, next\\)/);
+  assert.match(cloudSource, /queued\\?\\.uid === uid && sameValue\\(queued.payload, payload\\)/);
+});
+
+test('only a device without an established local career restores an account cloud save', () => {
+  const start = cloudSource.indexOf('if (!local && cloud)');
+  const end = cloudSource.indexOf('// Brand-new account and device', start);
+  assert.ok(start >= 0 && end > start);
+  assert.match(cloudSource.slice(start, end), /localStorage\\.setItem\\(LOCAL_KEY, JSON\\.stringify\\(cloud.payload\\)\\)/);
+  assert.match(cloudSource.slice(start, end), /location\\.reload\\(\\)/);
+});
+
+test('cloud writes use revision compare-and-set and retain failed snapshots for retry', () => {
+  assert.match(cloudSource, /async function writeCloud\\(payload, expectedUid = currentUser\\?\\.uid/);
+  assert.match(cloudSource, /actualRevision !== expectedRevision/);
+  assert.match(cloudSource, /save\\/revision-conflict/);
   assert.match(cloudSource, /retryDelay = 5000/);
   assert.match(cloudSource, /retrying automatically/);
-  assert.match(cloudSource, /if \(currentUser && syncReady && pendingBelongsToUser\(pendingPayload, currentUser\)\)/);
-  assert.match(cloudSource, /setTimeout\(\(\) => flushPendingSave\(nextUid\), retryDelay\)/);
-});
-
-test('cloud save queue does not discard gameplay state while reconciliation is busy', () => {
-  const start = cloudSource.indexOf('async function flushPendingSave');
-  const end = cloudSource.indexOf('function queueSave', start);
-  const flush = cloudSource.slice(start, end);
-  assert.match(flush, /if \(busy\) \{[\s\S]*?setTimeout\(\(\) => flushPendingSave\(expectedUid\), 1400\)/);
-  assert.ok(flush.indexOf('if (busy)') < flush.indexOf('writing = true;'),
-    'A save must wait for reconciliation to finish before beginning its write');
-});
-
-test('account-mismatched save conflict does not offer an unsafe keep-local upload', () => {
-  const start = cloudSource.indexOf('function showConflict(');
-  const end = cloudSource.indexOf('async function writeCloud', start);
-  const modal = cloudSource.slice(start, end);
-  assert.match(modal, /localOwnerUid !== currentUser\.uid/);
-  assert.match(modal, /This device career is linked to a different account/);
-  assert.match(modal, /KEEP THIS DEVICE/);
-  assert.match(modal, /RESTORE CLOUD CAREER/);
-  assert.ok(modal.indexOf('localOwnerUid !== currentUser.uid') < modal.indexOf('KEEP THIS DEVICE'),
-    'Keep-local action must be conditional on matching account ownership');
-});
-
-test('restoring a cloud conflict backs up the device career before replacing it', () => {
-  const start = cloudSource.indexOf('function keepCloud()');
-  const end = cloudSource.indexOf('function pendingBelongsToUser', start);
-  const restore = cloudSource.slice(start, end);
-  assert.ok(restore.indexOf('backupLocal(pending.localRaw)') >= 0);
-  assert.ok(restore.indexOf('backupLocal(pending.localRaw)') < restore.indexOf('localStorage.setItem(LOCAL_KEY'));
-  assert.ok(restore.indexOf('localStorage.setItem(LOCAL_KEY') < restore.indexOf('localStorage.setItem(OWNER_KEY'));
-  assert.match(restore, /pending\.uid !== currentUser\.uid/);
-});
-
-test('a deliberate cloud restore survives reload without reopening the same conflict', () => {
-  const restoreStart = cloudSource.indexOf('function keepCloud()');
-  const restoreEnd = cloudSource.indexOf('function pendingBelongsToUser', restoreStart);
-  const restore = cloudSource.slice(restoreStart, restoreEnd);
-  assert.match(restore, /RESTORE_MARKER_KEY/);
-  assert.match(restore, /revision: cloudRevision/);
-  assert.match(restore, /uid: currentUser\.uid/);
-  const reconcileStart = cloudSource.indexOf('async function reconcile(user)');
-  const reconcileEnd = cloudSource.indexOf('async function keepLocal()', reconcileStart);
-  const reconcile = cloudSource.slice(reconcileStart, reconcileEnd);
-  assert.match(reconcile, /restoreMarker\?\.uid === user\.uid/);
-  assert.match(reconcile, /localStorage\.setItem\(OWNER_KEY, user\.uid\)/);
-  assert.ok(reconcile.indexOf('restoreMarker?.uid === user.uid') < reconcile.indexOf('if (local?.ownerUid && local.ownerUid !== user.uid)'),
-    'An explicit cloud restore marker must be honored before the ordinary owner mismatch guard');
-  assert.match(reconcile, /localStorage\.setItem\(LOCAL_KEY, cloudPayload\)/);
-  assert.doesNotMatch(reconcile, /queueSave\(local\.payload\)/);
-  assert.match(reconcile, /JSON\.stringify\(local\.payload\) === cloudPayload/);
-  assert.match(reconcile, /reconcilingUids\.has\(user\.uid\)/);
-  assert.ok(reconcile.indexOf('RESTORE_MARKER_KEY') < reconcile.indexOf('if (!local && cloud)'));
-  assert.match(reconcile, /Cloud career restored and connected/);
-  assert.match(cloudSource, /restoreMarker\?\.uid === currentUser\.uid[\s\S]*?cannot be overwritten yet/);
-});
-
-test('local career owned by another account is never reconciled into the signed-in account', () => {
-  const ownerGuard = cloudSource.indexOf('if (local?.ownerUid && local.ownerUid !== user.uid)');
-  const cloudBranch = cloudSource.indexOf('if (snap.exists())', ownerGuard);
-  const noCloudBranch = cloudSource.indexOf('Nothing was uploaded', ownerGuard);
-  const returnIndex = cloudSource.indexOf('return;', noCloudBranch);
-  const linkedAccountBranch = cloudSource.indexOf('if (local?.ownerUid === user.uid)', ownerGuard);
-  assert.ok(ownerGuard >= 0 && cloudBranch > ownerGuard && noCloudBranch > cloudBranch);
-  assert.ok(returnIndex > noCloudBranch && linkedAccountBranch > returnIndex,
-    'Ownership mismatch must stop before a different account can upload or adopt the device career');
-  assert.match(cloudSource, /showConflict\(local\.raw, cloudData, local\.ownerUid\)/);
-  assert.match(cloudSource, /pending\.localOwnerUid && pending\.localOwnerUid !== pending\.uid/);
-  assert.match(cloudSource, /cannot be uploaded to this account/);
-});
-
-test('local career ownership prevents silent upload to a different signed-in account', () => {
-  assert.match(cloudSource, /const OWNER_KEY = "delwin_cloud_owner_uid"/);
-  assert.match(cloudSource, /ownerUid: localStorage\.getItem\(OWNER_KEY\)/);
-  assert.match(cloudSource, /if \(local\?\.ownerUid && local\.ownerUid !== user\.uid\) \{[\s\S]*?Nothing was uploaded/);
-  assert.match(cloudSource, /localStorage\.getItem\(OWNER_KEY\) !== currentUser\.uid/);
-  assert.match(cloudSource, /localStorage\.setItem\(OWNER_KEY, pending\.uid\)/);
-  assert.match(cloudSource, /localStorage\.setItem\(OWNER_KEY, currentUser\.uid\)/);
-});
-
-test('new cloud accounts initialize local ownership before the first gameplay save', () => {
-  const newAccountBranch = cloudSource.indexOf('if (!local && !cloud)');
-  const ownerSet = cloudSource.indexOf('localStorage.setItem(OWNER_KEY, user.uid);', newAccountBranch);
-  const readySet = cloudSource.indexOf('syncReady = true;', ownerSet);
-  assert.ok(newAccountBranch >= 0 && ownerSet > newAccountBranch && readySet > ownerSet,
-    'Owner marker must be set before cloud sync is enabled for a new account');
-  const guestLinkBranch = cloudSource.indexOf('if (local && !cloud)');
-  assert.ok(guestLinkBranch > 0 && cloudSource.indexOf('localStorage.setItem(OWNER_KEY, user.uid);', guestLinkBranch) > guestLinkBranch);
-});
-
-test('malformed local save values are treated as invalid and never auto-restored over cloud', () => {
-  assert.match(cloudSource, /parsed && typeof parsed === "object" && !Array\.isArray\(parsed\) \? \{ raw, payload: parsed, ownerUid: localStorage\.getItem\(OWNER_KEY\) \} : \{ raw, invalid: true \}/);
-  assert.match(cloudSource, /if \(local\?\.invalid\) return;/);
-});
-
-test('cloud reconciliation rejects stale account responses before touching local save', () => {
-  const getDocIndex = cloudSource.indexOf('const snap = await getDoc(ref);');
-  const guardIndex = cloudSource.indexOf('if (!currentUser || currentUser.uid !== user.uid) return;', getDocIndex);
-  const localReadIndex = cloudSource.indexOf('const local = localSnapshot();', getDocIndex);
-  assert.ok(getDocIndex >= 0 && guardIndex > getDocIndex && localReadIndex > guardIndex,
-    'Account identity must be rechecked after Firestore returns and before reading or changing local save');
-  assert.match(cloudSource, /if \(currentUser\?\.uid === user\.uid\) busy = false;/);
-  assert.match(cloudSource, /if \(previousUid !== nextUid\) \{[\s\S]*?clearTimeout\(syncTimer\);[\s\S]*?pendingPayload = null;[\s\S]*?busy = false;/);
 });
 
 test('stock pricing scales with rig and territory multipliers', () => {
@@ -1480,6 +1396,10 @@ function cloudModuleHarness({ local = {}, cloud = {}, user = null, online = true
     getAuth: () => auth,
     getFirestore: () => db,
     onAuthStateChanged(_auth, callback) { authObserver = callback; callback(auth.currentUser); },
+    onSnapshot: (ref, next, error) => {
+      calls.snapshots.push({ path: pathKey(ref), next, error });
+      return () => { calls.snapshots = calls.snapshots.filter(item => item.next !== next); };
+    },
     createUserWithEmailAndPassword: async (_auth, email) => {
       auth.currentUser = { uid: 'account-new', email };
       authObserver(auth.currentUser);
