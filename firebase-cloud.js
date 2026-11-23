@@ -544,47 +544,70 @@ async function reconcile(user) {
       return;
     }
 
-    // A device that already belongs to this account keeps playing its local
-    // career. Do not compare full saves, replace local data, or reload on startup.
-    // Each gameplay save is written locally first and queued for background backup.
+    // A device already linked to this account keeps its local career as the
+    // active save. The cloud is a backup: only apply remote changes when the
+    // confirmed baseline proves this device has not changed since its last sync.
     if (local?.ownerUid === user.uid) {
       if (!cloud) {
-        // Recover a missing cloud document from the already-linked local career.
-        // This is a one-time background seed, never a save-selection prompt.
-        await writeCloud(local.payload, user.uid, cloudRevision);
-        if (!currentUser || currentUser.uid !== user.uid) return;
+        syncReady = true;
+        queueSave(local.payload, { checkpointType: "rebuild-missing-cloud-backup" });
         status("Cloud backup reconnected from this device's saved career.");
-      } else {
-        const cloudRevisionOnServer = Number.isSafeInteger(cloud.revision) ? cloud.revision : 0;
-        const localRevision = Number.parseInt(localStorage.getItem(LOCAL_REVISION_KEY) || "0", 10) || 0;
-        const localMatchesCloud = sameValue(local.payload, cloud.payload);
-        // A browser may have initialized only the default/tutorial career before
-        // auth restored. It is safe to archive that starter state and load the
-        // account's established cloud career without showing a false conflict.
-        if (!localMatchesCloud) {
-          // A local save can be newer than the cloud even when its upload queue
-          // was lost during a reload/offline session. Always reconcile against
-          // the last confirmed synced baseline, not revision numbers alone.
-          if (cloudRevisionOnServer > localRevision && isStarterCareer(local.payload)) {
-            restoreCloudCareer(local, cloud, user.uid, "starter-save-before-cloud-refresh");
-            return;
-          }
-          if (tryApplyNewerCloud(cloud, local)) {
-            status("Your latest cloud career was restored in the background.");
-          } else if (tryMergeConcurrentCareer(cloud, local)) {
-            status("Unsynchronized device progress was reconciled with your cloud career.");
-          } else {
-            showConflict(local.raw, cloud, local.ownerUid);
-            status("Both devices changed overlapping career data. Both saves are preserved; choose which career to keep.", true);
-            return;
-          }
-        } else {
-          localStorage.setItem(LOCAL_REVISION_KEY, String(cloudRevisionOnServer));
-          localStorage.setItem(SYNCED_SNAPSHOT_KEY, JSON.stringify(cloud.payload));
-        }
-        status("Cloud backup connected · this device is ready.");
+        return;
       }
+
+      const cloudRevisionOnServer = Number.isSafeInteger(cloud.revision) ? cloud.revision : 0;
+      const baseline = readSyncedBaseline();
+      const localMatchesCloud = sameValue(local.payload, cloud.payload);
+      if (localMatchesCloud) {
+        localStorage.setItem(LOCAL_REVISION_KEY, String(cloudRevisionOnServer));
+        localStorage.setItem(SYNCED_SNAPSHOT_KEY, JSON.stringify(cloud.payload));
+        syncReady = true;
+        status("Cloud backup connected · this device is ready.");
+        return;
+      }
+
+      if (baseline) {
+        const localMatchesBaseline = sameValue(local.payload, baseline);
+        const cloudMatchesBaseline = sameValue(cloud.payload, baseline);
+        if (localMatchesBaseline) {
+          if (tryApplyNewerCloud(cloud, local)) {
+            syncReady = true;
+            status("Your latest cloud career is ready to apply at a safe gameplay checkpoint.");
+            return;
+          }
+        } else if (cloudMatchesBaseline) {
+          // Only this device changed since the confirmed common snapshot.
+          cloudRevision = cloudRevisionOnServer;
+          syncReady = true;
+          queueSave(local.payload, { checkpointType: "local-first-recovery" });
+          status("Your device progress is being backed up automatically.");
+          return;
+        } else if (tryMergeConcurrentCareer(cloud, local)) {
+          syncReady = true;
+          return;
+        } else {
+          showConflict(local.raw, cloud, local.ownerUid);
+          status("Both devices changed overlapping career data. Both saves are preserved; choose how to resolve the conflict.", true);
+          return;
+        }
+      } else {
+        // Older installations may not have a confirmed baseline. Do not let
+        // an unknown cloud timestamp select the active career. Preserve the
+        // cloud envelope locally, then back up this already-linked device save
+        // using the server's current revision as the compare-and-set baseline.
+        localStorage.setItem(`delwin_cloud_backup_unbased_${user.uid}_${Date.now()}`, JSON.stringify(cloud));
+        cloudRevision = cloudRevisionOnServer;
+        syncReady = true;
+        queueSave(local.payload, { checkpointType: "local-first-baseline-recovery" });
+        status("This device's career remains active. Its previous cloud copy was preserved while the device backup reconnects.");
+        return;
+      }
+
+      // If the remote update could not be applied immediately (for example,
+      // an active repair is in progress), keep gameplay uninterrupted and
+      // defer it to the next safe checkpoint.
       syncReady = true;
+      status("Cloud backup connected. Any remote update will wait until gameplay is safe.");
       return;
     }
 
