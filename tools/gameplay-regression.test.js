@@ -1498,10 +1498,21 @@ function cloudModuleHarness({ local = {}, cloud = {}, user = null, online = true
       const value = cloudDocs.get(pathKey(ref));
       return { exists: () => value !== undefined, data: () => value };
     },
-    setDoc: async (ref, value) => {
-      calls.writes.push({ path: pathKey(ref), value });
-      if (failWrites > 0) { failWrites -= 1; throw new Error('simulated offline write'); }
-      cloudDocs.set(pathKey(ref), value);
+    runTransaction: async (_db, callback) => {
+      const writes = [];
+      const transaction = {
+        get: async ref => {
+          const value = cloudDocs.get(pathKey(ref));
+          return { exists: () => value !== undefined, data: () => value };
+        },
+        set: (ref, value) => writes.push({ ref, value })
+      };
+      await callback(transaction);
+      for (const item of writes) {
+        calls.writes.push({ path: pathKey(item.ref), value: item.value });
+        if (failWrites > 0) { failWrites -= 1; throw new Error('simulated offline write'); }
+        cloudDocs.set(pathKey(item.ref), item.value);
+      }
     },
     serverTimestamp: () => ({ seconds: 123456 }),
     localSnapshot: undefined
@@ -1760,6 +1771,46 @@ test('a fresh device restores a valid cloud career and records its account owner
   assert.equal(h.store.get('delwin_cloud_owner_uid'), 'account-C');
   assert.equal(h.calls.reloads, 1);
   assert.equal(h.calls.writes.length, 0);
+});
+
+test('stale device revision cannot overwrite a newer cloud career', async () => {
+  const oldDeviceCareer = { cash: 500, jobsCompleted: 8 };
+  const h = cloudModuleHarness({
+    local: {
+      delwin_v4_save: JSON.stringify(oldDeviceCareer),
+      delwin_cloud_owner_uid: 'account-revision'
+    },
+    user: { uid: 'account-revision', email: 'revision@example.com' },
+    cloud: {
+      'users/account-revision/saves/current': {
+        schemaVersion: 1, revision: 4,
+        payload: { cash: 900, jobsCompleted: 16 },
+        updatedAt: {}, deviceId: 'newer-device'
+      }
+    },
+    online: false
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.calls.gets.length, 1);
+  h.context.window.DelWinCloud.queueSave({ cash: 525, jobsCompleted: 9 });
+  // Another device commits after this device last read revision 4.
+  h.cloudDocs.set('users/account-revision/saves/current', {
+    schemaVersion: 1, revision: 5,
+    payload: { cash: 950, jobsCompleted: 17 },
+    updatedAt: {}, deviceId: 'newer-device'
+  });
+  h.context.navigator.onLine = true;
+  await h.context.window.__onlineHandler();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.cloudDocs.get('users/account-revision/saves/current').revision, 5);
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(h.cloudDocs.get('users/account-revision/saves/current').payload)),
+    { cash: 950, jobsCompleted: 17 },
+    'The stale device write must not replace newer cloud progress'
+  );
+  assert.equal(h.calls.modal.includes('SAVE CONFLICT'), true,
+    'A stale-device conflict must require an explicit player choice');
+  assert.match(h.elements.get('cloud-account-status').textContent, /newer cloud career exists/i);
 });
 
 test('offline saves stay local and do not attempt a cloud write', async () => {
