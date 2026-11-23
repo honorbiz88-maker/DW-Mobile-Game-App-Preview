@@ -4,7 +4,8 @@ import {
   signInWithEmailAndPassword, sendPasswordResetEmail, signOut
 } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-auth.js";
 import {
-  getFirestore, doc, getDoc, onSnapshot, runTransaction, serverTimestamp
+  getFirestore, initializeFirestore, persistentLocalCache,
+  persistentMultipleTabManager, doc, getDoc, onSnapshot, runTransaction, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -26,7 +27,21 @@ const RESTORE_MARKER_KEY = "delwin_cloud_restore_pending";
 const SCHEMA_VERSION = 1;
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
+// Use Firebase's durable IndexedDB cache and multi-tab coordination where the
+// browser supports it. The game save remains local-first; this cache is an
+// additional Firebase layer, not the source of truth for active gameplay.
+let db;
+try {
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager()
+    })
+  });
+} catch (error) {
+  // Unsupported browsers or an already-initialized Firestore instance retain
+  // the safe memory-cache fallback; local career saving remains operational.
+  db = getFirestore(app);
+}
 let currentUser = null;
 let syncReady = false;
 let cloudRevision = 0;
