@@ -12,7 +12,8 @@ service cloud.firestore {
             'schemaVersion', 'payload', 'revision', 'updatedAt', 'deviceId'
           ])
           && request.resource.data.keys().hasOnly([
-            'schemaVersion', 'payload', 'revision', 'updatedAt', 'deviceId'
+            'schemaVersion', 'payload', 'revision', 'updatedAt', 'deviceId',
+            'sessionId', 'sessionStartedAt', 'clientSavedAt', 'checkpointType'
           ])
           && request.resource.data.schemaVersion is int
           && request.resource.data.schemaVersion >= 1
@@ -21,7 +22,11 @@ service cloud.firestore {
           && request.resource.data.revision >= 1
           && request.resource.data.updatedAt is timestamp
           && request.resource.data.deviceId is string
-          && request.resource.data.deviceId.size() <= 128;
+          && request.resource.data.deviceId.size() <= 128
+          && (!('sessionId' in request.resource.data) || (request.resource.data.sessionId is string && request.resource.data.sessionId.size() <= 128))
+          && (!('sessionStartedAt' in request.resource.data) || request.resource.data.sessionStartedAt is int)
+          && (!('clientSavedAt' in request.resource.data) || request.resource.data.clientSavedAt is int)
+          && (!('checkpointType' in request.resource.data) || (request.resource.data.checkpointType is string && request.resource.data.checkpointType.size() <= 64));
       }
 
       allow create, update: if request.auth != null
