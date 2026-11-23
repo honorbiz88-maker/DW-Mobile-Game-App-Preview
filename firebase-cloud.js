@@ -652,6 +652,8 @@ async function flushPendingSave(expectedUid) {
       // Stop automatic writes and present both copies. A player must explicitly
       // choose; an older/offline device can never silently replace newer cloud progress.
       syncReady = false;
+      let merged = false;
+      let conflictShown = false;
       try {
         const latest = await getDoc(doc(db, "users", expectedUid, "saves", "current"));
         if (currentUser?.uid !== expectedUid) return;
@@ -659,14 +661,20 @@ async function flushPendingSave(expectedUid) {
         if (cloudData?.payload && typeof cloudData.payload === "object" && !Array.isArray(cloudData.payload)) {
           cloudRevision = Number.isSafeInteger(cloudData.revision) ? cloudData.revision : 0;
           const local = localSnapshot();
-          if (local && !local.invalid && tryMergeConcurrentCareer(cloudData, local)) {
-            status("Your local changes and the newer cloud changes were combined. Syncing the combined career…");
-          } else if (local && !local.invalid) {
-            showConflict(local.raw, cloudData, local.ownerUid);
+          if (local && !local.invalid) {
+            merged = tryMergeConcurrentCareer(cloudData, local);
+            if (!merged) {
+              showConflict(local.raw, cloudData, local.ownerUid);
+              conflictShown = true;
+            }
           }
         }
-      } catch {}
-      status("A newer cloud career exists. Your device progress is safe; choose which career to keep before syncing again.", true);
+      } catch (reconcileError) {
+        status("Cloud changed while syncing. Your device save is preserved; reconnect to retry safely.", true);
+      }
+      if (!merged && !conflictShown) {
+        status("A newer cloud career exists. Your device progress is safe; choose which career to keep before syncing again.", true);
+      }
     } else if (currentUser?.uid === expectedUid && syncReady) {
       // Keep the newest queued state; otherwise retry the failed snapshot.
       if (!pendingBelongsToUser(pendingPayload, currentUser)) {
