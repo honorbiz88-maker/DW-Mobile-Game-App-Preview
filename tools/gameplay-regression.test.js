@@ -1447,7 +1447,7 @@ test('guest play remains available and optional Firebase account controls are wi
   for (const id of ['cloud-signed-out', 'cloud-signed-in', 'cloud-email', 'cloud-password', 'cloud-create', 'cloud-signin', 'cloud-reset', 'cloud-signout', 'cloud-account-status', 'cloud-user-email']) {
     assert.match(html, new RegExp('id="' + id + '"'), 'Missing account UI element: ' + id);
   }
-  assert.match(html, /<script type="module" src="firebase-cloud\\.js(?:\\?v=[^"]+)?"><\\/script>/);
+  assert.match(html, /<script type="module" src="firebase-cloud\.js(?:\?v=[^"]+)?"><\/script>/);
   assert.match(html, /<main id="page-dispatch" class="page active">/,
     'Dispatch must remain the active initial page without an account gate');
   assert.match(source, /localStorage\.setItem\('delwin_v4_save', JSON\.stringify\(state\)\)/,
