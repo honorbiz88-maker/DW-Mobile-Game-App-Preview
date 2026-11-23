@@ -161,8 +161,8 @@ test('standard tire purchase deducts cash and persists inventory in the same loc
 test('account controls can call the real synchronous local-first save checkpoint', () => {
   assert.ok(source.includes('window.saveState = saveState;'));
   const save = extractFunction('saveState');
-  assert.match(save, /localStorage\\.setItem\\('delwin_v4_save'/);
-  assert.match(save, /window\\.DelWinCloud\\.queueSave/);
+  assert.ok(save.includes("localStorage.setItem('delwin_v4_save'"));
+  assert.ok(save.includes('window.DelWinCloud.queueSave'));
 });
 
 test('local storage failure is surfaced instead of silently treating gameplay as saved', () => {
