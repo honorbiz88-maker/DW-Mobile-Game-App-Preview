@@ -1067,3 +1067,42 @@ button, .lug-btn, .hud-pill-compact {
     scroll-behavior: auto !important;
   }
 }
+
+
+/* A second tab must not be allowed to write over the active career. */
+.save-tab-lock {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+  background: rgba(5, 10, 18, 0.97);
+}
+.save-tab-lock[hidden] { display: none !important; }
+.save-tab-lock-card {
+  width: min(100%, 390px);
+  padding: 26px 22px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 18px;
+  background: #111b2a;
+  color: #f8fafc;
+  text-align: center;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+}
+.save-tab-lock-icon { font-size: 32px; margin-bottom: 12px; }
+.save-tab-lock-card h2 { margin: 0 0 12px; font-size: 22px; }
+.save-tab-lock-card p { color: #cbd5e1; line-height: 1.55; font-size: 14px; }
+.save-tab-lock-card .save-tab-lock-hint { color: #94a3b8; font-size: 12px; }
+.save-tab-lock-card button {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 12px;
+  border: 0;
+  border-radius: 10px;
+  background: #f59e0b;
+  color: #111827;
+  font-weight: 800;
+  letter-spacing: .04em;
+}
