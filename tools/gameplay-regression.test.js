@@ -121,6 +121,31 @@ test('local storage failure is surfaced instead of silently treating gameplay as
   assert.equal(errors.length, 1);
 });
 
+test('one tab owns the career writer lock before the game can be used', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const css = fs.readFileSync(path.join(__dirname, '..', 'style.css'), 'utf8');
+  assert.match(html, /delwin-mobile-game-career-writer/);
+  assert.match(html, /navigator\.locks\?\.request/);
+  assert.match(html, /delwin_active_save_tab_v1/);
+  assert.match(html, /id="save-tab-lock"/);
+  assert.match(css, /\.save-tab-lock\s*\{/);
+  assert.match(source, /window\.__delwinWriterTab === false/);
+  assert.match(source, /delwin-save-writer-ready/);
+});
+
+test('a non-owner tab cannot write or queue a gameplay save', () => {
+  const writes = [];
+  const state = { cash: 150 };
+  const save = gameFunction('saveState', {
+    state,
+    window: { __delwinWriterTab: false, DelWinCloud: { queueSave: () => { throw new Error('non-owner queued cloud save'); } } },
+    localStorage: { setItem: (...args) => writes.push(args) },
+    console: { error: () => {} }
+  });
+  save('purchase');
+  assert.equal(writes.length, 0);
+});
+
 test('durable outbox is persisted before network work and cleared only after matching acknowledgement', () => {
   const queueStart = cloudSource.indexOf('function queueSave(');
   const queueEnd = cloudSource.indexOf('function isRestorePending()', queueStart);
