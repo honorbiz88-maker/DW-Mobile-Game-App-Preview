@@ -80,10 +80,12 @@ test('switching accounts archives the outgoing career and activates only the inc
     ['delwin_cloud_revision', '4'],
     ['delwin_cloud_synced_snapshot', JSON.stringify({ cash: 100 })],
     ['delwin_cloud_pending_outbox_v1', JSON.stringify({ uid: 'account-A', payload: { cash: 111 } })],
+    ['delwin_cloud_restore_pending', JSON.stringify({ uid: 'account-A', revision: 5, cloudPayload: { cash: 100 } })],
     ['delwin_account_account-B_career', JSON.stringify({ cash: 900, jobsCompleted: 20 })],
     ['delwin_account_account-B_revision', '8'],
     ['delwin_account_account-B_baseline', JSON.stringify({ cash: 850 })],
-    ['delwin_account_account-B_outbox', JSON.stringify({ uid: 'account-B', payload: { cash: 900 } })]
+    ['delwin_account_account-B_outbox', JSON.stringify({ uid: 'account-B', payload: { cash: 900 } })],
+    ['delwin_account_account-B_restore', JSON.stringify({ uid: 'account-B', revision: 9, cloudPayload: { cash: 950 } })]
   ]);
   const localStorage = {
     getItem: key => storage.has(key) ? storage.get(key) : null,
@@ -123,6 +125,8 @@ test('switching accounts archives the outgoing career and activates only the inc
   assert.equal(localStorage.getItem('delwin_cloud_revision'), '8');
   assert.equal(localStorage.getItem('delwin_cloud_synced_snapshot'), JSON.stringify({ cash: 850 }));
   assert.equal(JSON.parse(localStorage.getItem('delwin_cloud_pending_outbox_v1')).uid, 'account-B');
+  assert.equal(localStorage.getItem('delwin_account_account-A_restore'), JSON.stringify({ uid: 'account-A', revision: 5, cloudPayload: { cash: 100 } }));
+  assert.equal(localStorage.getItem('delwin_cloud_restore_pending'), JSON.stringify({ uid: 'account-B', revision: 9, cloudPayload: { cash: 950 } }));
 });
 
 test('switching to an account without a local career clears only the active slot for cloud restore', () => {
