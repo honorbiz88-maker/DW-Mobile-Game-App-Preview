@@ -24,7 +24,7 @@ This guide prepares the Firebase project used by the DelWin Mobile game. Keep th
 2. Choose production mode.
 3. Choose a nearby region. The database region cannot easily be changed later, so choose deliberately.
 4. After creation, open the **Rules** tab and replace the starter rules with the current contents of `firestore.rules` in this repository. Re-publish the rules whenever that file changes; committing it to GitHub does not deploy Firestore rules.
-5. Publish the rules. Confirm the published rules require `schemaVersion`, `payload`, `revision`, `updatedAt`, and `deviceId` for each save document.
+5. Publish the rules. Confirm the published rules require `schemaVersion`, `payload`, `revision`, `updatedAt`, and `deviceId`, and permit the optional session/checkpoint metadata fields.
 
 The rules allow an authenticated player to read and write only:
 `users/{their-auth-uid}/saves/current`.
@@ -45,6 +45,9 @@ The cloud document envelope will contain:
 - `revision`: monotonically increasing integer used by transactional compare-and-set writes to prevent stale devices overwriting newer progress.
 - `updatedAt`: Firestore server timestamp.
 - `deviceId`: non-sensitive per-install identifier used for conflict diagnostics.
+- `sessionId` and `sessionStartedAt`: identify the browser session that produced the save.
+- `clientSavedAt`: client-side diagnostic timestamp; it is not used to decide which save wins.
+- `checkpointType`: describes the save event (for example, gameplay, job completion, session background, or session end). The Firestore `revision` remains the authoritative ordering mechanism.
 
 The game must continue writing its existing `delwin_v4_save` localStorage key. On first sign-in:
 - If only a local save exists, back it up locally before uploading it.
@@ -52,7 +55,7 @@ The game must continue writing its existing `delwin_v4_save` localStorage key. O
 - If both exist and differ, do not silently replace either. Present a clear choice to keep the local career or restore the cloud career, and retain a backup of the non-selected copy.
 - Preserve the current `tires` → `stdTires` compatibility migration and existing tool-level bounds.
 
-When offline, gameplay and local saving continue. Cloud sync is queued until the player is online and authenticated. Sync only after meaningful save events / a controlled debounce, not on every animation frame.
+When offline, gameplay and local saving continue. Cloud sync is queued until the player is online and authenticated. Sync only after meaningful save events / a controlled debounce, not on every animation frame. Session background and page-exit events also request a final checkpoint, but browser shutdown is not guaranteed to complete network requests.
 
 ## 6. Security and product boundaries
 
