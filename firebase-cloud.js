@@ -360,7 +360,7 @@ function tryApplyNewerCloud(cloud, local) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return false;
   let baseline = null;
   try { baseline = JSON.parse(localStorage.getItem(SYNCED_SNAPSHOT_KEY) || 'null'); } catch {}
-  if (!baseline || JSON.stringify(local.payload) !== JSON.stringify(baseline)) return false;
+  if (!baseline || !sameValue(local.payload, baseline)) return false;
   const apply = window.DelWinApplyCloudSave;
   if (typeof apply !== 'function' || !apply(payload)) { deferredCloudUpdate = cloud; return true; }
   const revision = Number.isSafeInteger(cloud.revision) ? cloud.revision : 0;
@@ -410,7 +410,7 @@ function watchCloud(user) {
     const local = localSnapshot();
     if (!local || local.invalid) return;
     const localRevision = Number.parseInt(localStorage.getItem(LOCAL_REVISION_KEY) || "0", 10) || 0;
-    if (revision > localRevision && JSON.stringify(local.payload) !== JSON.stringify(cloud.payload)) {
+    if (revision > localRevision && !sameValue(local.payload, cloud.payload)) {
       cloudRevision = revision;
       if (tryApplyNewerCloud(cloud, local)) return;
       if (tryMergeConcurrentCareer(cloud, local)) return;
@@ -418,7 +418,7 @@ function watchCloud(user) {
       pendingPayload = null;
       showConflict(local.raw, cloud, local.ownerUid);
       status("Both devices changed the same career data. Both saves are preserved; choose which career to keep.", true);
-    } else if (JSON.stringify(local.payload) === JSON.stringify(cloud.payload)) {
+    } else if (sameValue(local.payload, cloud.payload)) {
       localStorage.setItem(LOCAL_REVISION_KEY, String(revision));
       cloudRevision = revision;
     }
@@ -455,7 +455,7 @@ async function reconcile(user) {
         return;
       }
       const cloudPayload = JSON.stringify(selectedPayload);
-      const localMatchesCloud = !!local && JSON.stringify(local.payload) === cloudPayload;
+      const localMatchesCloud = !!local && sameValue(local.payload, selectedPayload);
       localStorage.setItem(OWNER_KEY, user.uid);
       if (!localMatchesCloud) {
         if (local) backupLocal(local.raw, "restore-reconciliation");
@@ -509,7 +509,7 @@ async function reconcile(user) {
       } else {
         const cloudRevisionOnServer = Number.isSafeInteger(cloud.revision) ? cloud.revision : 0;
         const localRevision = Number.parseInt(localStorage.getItem(LOCAL_REVISION_KEY) || "0", 10) || 0;
-        const localMatchesCloud = JSON.stringify(local.payload) === JSON.stringify(cloud.payload);
+        const localMatchesCloud = sameValue(local.payload, cloud.payload);
         // A browser may have initialized only the default/tutorial career before
         // auth restored. It is safe to archive that starter state and load the
         // account's established cloud career without showing a false conflict.
