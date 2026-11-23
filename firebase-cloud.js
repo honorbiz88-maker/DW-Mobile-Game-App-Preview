@@ -195,7 +195,9 @@ function isStarterCareer(payload) {
     && (payload.contractsCompleted || 0) === 0
     && (!payload.customerLedger || Object.keys(payload.customerLedger).length === 0)
     && (!Array.isArray(payload.claimedCareerGearMilestones) || payload.claimedCareerGearMilestones.length === 0)
-    && (!Array.isArray(payload.jobs) || payload.jobs.length === 0)
+    // The dispatch board generates fresh job offers during startup. Those
+    // offers are not player progress and must not make a pristine new-device
+    // starter save look like a separate guest career.
     && tutorialOnly
     && toolLevels;
 }
