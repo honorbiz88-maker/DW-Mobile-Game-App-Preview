@@ -146,112 +146,6 @@ function backupLocal(raw, suffix = "before-cloud-change") {
   localStorage.setItem(key, raw);
   return key;
 }
-function listLocalBackups() {
-  const backups = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (!key || !key.startsWith("delwin_backup_")) continue;
-    try {
-      const raw = localStorage.getItem(key);
-      const payload = JSON.parse(raw || "null");
-      if (!payload || typeof payload !== "object" || Array.isArray(payload)) continue;
-      const timestampMatch = key.match(/_(\d{10,})$/);
-      backups.push({
-        key, raw, payload,
-        timestamp: timestampMatch ? Number(timestampMatch[1]) : 0
-      });
-    } catch {}
-  }
-  return backups.sort((a, b) => b.timestamp - a.timestamp);
-}
-function backupSummary(payload) {
-  const cash = Number.isFinite(payload.cash) ? "$" + Math.floor(payload.cash).toLocaleString() : "Unknown";
-  const tires = Number.isFinite(payload.stdTires) ? Math.floor(payload.stdTires) : "Unknown";
-  const jobs = Number.isFinite(payload.jobsCompleted) ? Math.floor(payload.jobsCompleted) : "Unknown";
-  return { cash, tires, jobs };
-}
-function showBackupRecovery() {
-  const backups = listLocalBackups();
-  if (!backups.length) {
-    status("No recoverable device backups were found in this browser.", true);
-    return;
-  }
-  const backup = backups[0];
-  const summary = backupSummary(backup.payload);
-  const date = backup.timestamp ? new Date(backup.timestamp).toLocaleString() : "Date unavailable";
-  const open = window.openModal;
-  if (typeof open !== "function") return status("Backup recovery is unavailable right now.", true);
-  const options = backups.slice(0, 10).map((item, index) => {
-    const details = backupSummary(item.payload);
-    const when = item.timestamp ? new Date(item.timestamp).toLocaleString() : "Date unavailable";
-    return '<option value="' + index + '">' + when.replace(/[<>]/g, "") + ' · Cash ' + details.cash + ' · Standard tires ' + details.tires + '</option>';
-  }).join("");
-  open(`
-    <span class="badge">DEVICE BACKUP RECOVERY</span>
-    <h3>Recover a previous device save</h3>
-    <p style="font-size:12px;color:var(--muted);">These backups are stored only in this browser. Selecting one will not change anything until you confirm the recovery.</p>
-    <label for="dw-backup-choice" style="display:block;font-size:11px;margin:10px 0 5px;">AVAILABLE BACKUPS</label>
-    <select id="dw-backup-choice" style="width:100%;box-sizing:border-box;">${options}</select>
-    <div id="dw-backup-preview" style="font-size:12px;margin:10px 0;color:var(--muted);">Selected backup: ${date}<br>Cash: ${summary.cash}<br>Standard tires: ${summary.tires}<br>Jobs completed: ${summary.jobs}</div>
-    <button class="primary-btn" onclick="window.DelWinCloud.recoverBackupFromPicker()">RECOVER SELECTED BACKUP</button>
-    <button class="secondary-btn" onclick="window.closeModal?.()">CANCEL</button>
-    <p style="font-size:10px;color:var(--muted);">Your current device save will also be backed up first. The cloud save will be updated only after you confirm and the revision check succeeds.</p>
-  `);
-  window.DelWinCloud.backupChoices = backups.slice(0, 10).map(({key}) => key);
-}
-async function recoverBackupFromPicker() {
-  if (!currentUser || !syncReady) return status("Sign in and wait for cloud backup to connect before recovering a save.", true);
-  const select = document.getElementById("dw-backup-choice");
-  const index = Number.parseInt(select?.value || "0", 10);
-  const key = window.DelWinCloud.backupChoices?.[index];
-  if (!key || !/^delwin_backup_[a-zA-Z0-9_-]+_\d{10,}$/.test(key)) return status("That backup selection is no longer available.", true);
-  const raw = localStorage.getItem(key);
-  let payload;
-  try { payload = JSON.parse(raw || "null"); } catch {}
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return status("The selected backup could not be read. No save was changed.", true);
-  const summary = backupSummary(payload);
-  if (!window.confirm("Recover this device backup?\nCash: " + summary.cash + "\nStandard tires: " + summary.tires + "\nJobs completed: " + summary.jobs + "\n\nYour current device and cloud saves will be backed up first. The selected backup will then replace the active career on this account.")) return;
-  const uid = currentUser.uid;
-  const local = localSnapshot();
-  if (local && !local.invalid) backupLocal(local.raw, "before-backup-recovery");
-  let cloudBefore = null;
-  try {
-    const latest = await getDoc(doc(db, "users", uid, "saves", "current"));
-    if (currentUser?.uid !== uid) return;
-    if (latest.exists()) {
-      cloudBefore = latest.data();
-      localStorage.setItem(`delwin_cloud_backup_${uid}_${Date.now()}`, JSON.stringify(cloudBefore));
-      cloudRevision = Number.isSafeInteger(cloudBefore.revision) ? cloudBefore.revision : 0;
-    }
-    // Write the selected payload with a transaction revision check BEFORE
-    // changing the active device save. A concurrent cloud update aborts safely.
-    syncReady = false;
-    clearTimeout(syncTimer);
-    syncTimer = null;
-    pendingPayload = null;
-    await writeCloud(payload, uid, cloudRevision, {type:"manual-backup-recovery"});
-    if (currentUser?.uid !== uid) return;
-    const revision = cloudRevision;
-    localStorage.setItem(RESTORE_MARKER_KEY, JSON.stringify({
-      uid, revision, deviceId: getDeviceId(), cloudPayload: payload
-    }));
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(payload));
-    localStorage.setItem(OWNER_KEY, uid);
-    localStorage.setItem(LOCAL_REVISION_KEY, String(revision));
-    localStorage.setItem(SYNCED_SNAPSHOT_KEY, JSON.stringify(payload));
-    window.DelWinCloud.backupChoices = null;
-    window.closeModal?.();
-    status("Backup recovered. Reloading the game with the selected career…");
-    location.reload();
-  } catch (error) {
-    if (currentUser?.uid === uid) {
-      syncReady = true;
-      if (local && !local.invalid) queueSave(local.payload, {checkpointType:"recovery-aborted"});
-      status("Backup recovery stopped: " + error.message + ". The selected backup remains available and the existing cloud career was not overwritten.", true);
-    }
-  }
-}
-
 function isStarterCareer(payload) {
   if (!payload || typeof payload !== "object") return false;
   const toolLevels = payload.tools && typeof payload.tools === "object"
@@ -604,22 +498,26 @@ async function reconcile(user) {
         // A browser may have initialized only the default/tutorial career before
         // auth restored. It is safe to archive that starter state and load the
         // account's established cloud career without showing a false conflict.
-        if (cloudRevisionOnServer > localRevision && !localMatchesCloud && isStarterCareer(local.payload)) {
-          restoreCloudCareer(local, cloud, user.uid, "starter-save-before-cloud-refresh");
-          return;
-        }
-        if (cloudRevisionOnServer > localRevision && !localMatchesCloud) {
-          if (tryApplyNewerCloud(cloud, local)) {
-            status("Your latest cloud career was restored in the background.");
-          } else {
-            showConflict(local.raw, cloud, local.ownerUid);
-            status("Both devices have made progress. Both saves are preserved; choose which career to keep.", true);
+        if (!localMatchesCloud) {
+          // A local save can be newer than the cloud even when its upload queue
+          // was lost during a reload/offline session. Always reconcile against
+          // the last confirmed synced baseline, not revision numbers alone.
+          if (cloudRevisionOnServer > localRevision && isStarterCareer(local.payload)) {
+            restoreCloudCareer(local, cloud, user.uid, "starter-save-before-cloud-refresh");
             return;
           }
-        }
-        if (localMatchesCloud || cloudRevisionOnServer === localRevision) {
+          if (tryApplyNewerCloud(cloud, local)) {
+            status("Your latest cloud career was restored in the background.");
+          } else if (tryMergeConcurrentCareer(cloud, local)) {
+            status("Unsynchronized device progress was reconciled with your cloud career.");
+          } else {
+            showConflict(local.raw, cloud, local.ownerUid);
+            status("Both devices changed overlapping career data. Both saves are preserved; choose which career to keep.", true);
+            return;
+          }
+        } else {
           localStorage.setItem(LOCAL_REVISION_KEY, String(cloudRevisionOnServer));
-          if (localMatchesCloud) localStorage.setItem(SYNCED_SNAPSHOT_KEY, JSON.stringify(cloud.payload));
+          localStorage.setItem(SYNCED_SNAPSHOT_KEY, JSON.stringify(cloud.payload));
         }
         status("Cloud backup connected · this device is ready.");
       }
@@ -827,7 +725,7 @@ function isRestorePending() {
     return false;
   }
 }
-window.DelWinCloud = { queueSave, keepLocal, keepCloud, showBackupRecovery, recoverBackupFromPicker, onSafeCheckpoint: processDeferredCloudUpdate, signOut: () => signOut(auth), hasAccount: () => !!currentUser, isRestorePending, pendingConflict: null, backupChoices: null };
+window.DelWinCloud = { queueSave, keepLocal, keepCloud, onSafeCheckpoint: processDeferredCloudUpdate, signOut: () => signOut(auth), hasAccount: () => !!currentUser, isRestorePending, pendingConflict: null };
 window.addEventListener("online", () => {
   if (!currentUser || !navigator.onLine) return;
   // Retry only an authentication setup that previously failed. Healthy
