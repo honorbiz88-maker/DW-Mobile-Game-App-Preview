@@ -1442,7 +1442,7 @@ function cloudModuleHarness({ local = {}, cloud = {}, user = null, online = true
   const cloudDocs = new Map(Object.entries(cloud));
   const elements = new Map();
   const timers = new Map();
-  const calls = { gets: [], writes: [], reloads: 0, modal: '', listeners: {}, windowListeners: {} };
+  const calls = { gets: [], writes: [], reloads: 0, modal: '', listeners: {}, windowListeners: {}, snapshots: [] };
   const elementIds = [
     'cloud-account-card', 'cloud-create', 'cloud-signin', 'cloud-reset', 'cloud-signout',
     'cloud-email', 'cloud-password', 'cloud-account-status', 'cloud-signed-out',
@@ -1497,6 +1497,10 @@ function cloudModuleHarness({ local = {}, cloud = {}, user = null, online = true
       calls.gets.push(pathKey(ref));
       const value = cloudDocs.get(pathKey(ref));
       return { exists: () => value !== undefined, data: () => value };
+    },
+    onSnapshot: (ref, next, error) => {
+      calls.snapshots.push({ path: pathKey(ref), next, error });
+      return () => { calls.snapshots = calls.snapshots.filter(item => item.next !== next); };
     },
     runTransaction: async (_db, callback) => {
       const writes = [];
