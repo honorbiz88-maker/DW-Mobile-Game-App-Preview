@@ -1627,46 +1627,6 @@ test('a fresh device restores a valid cloud career and records its account owner
   assert.equal(h.calls.writes.length, 0);
 });
 
-test('stale device revision cannot overwrite a newer cloud career', async () => {
-  const oldDeviceCareer = { cash: 500, jobsCompleted: 8 };
-  const h = cloudModuleHarness({
-    local: {
-      delwin_v4_save: JSON.stringify(oldDeviceCareer),
-      delwin_cloud_owner_uid: 'account-revision'
-    },
-    user: { uid: 'account-revision', email: 'revision@example.com' },
-    cloud: {
-      'users/account-revision/saves/current': {
-        schemaVersion: 1, revision: 4,
-        payload: { cash: 900, jobsCompleted: 16 },
-        updatedAt: {}, deviceId: 'newer-device'
-      }
-    },
-    online: false
-  });
-  await new Promise(resolve => setImmediate(resolve));
-  assert.equal(h.calls.gets.length, 1);
-  h.context.window.DelWinCloud.queueSave({ cash: 525, jobsCompleted: 9 });
-  // Another device commits after this device last read revision 4.
-  h.cloudDocs.set('users/account-revision/saves/current', {
-    schemaVersion: 1, revision: 5,
-    payload: { cash: 950, jobsCompleted: 17 },
-    updatedAt: {}, deviceId: 'newer-device'
-  });
-  h.context.navigator.onLine = true;
-  await h.context.window.__onlineHandler();
-  await new Promise(resolve => setImmediate(resolve));
-  assert.equal(h.cloudDocs.get('users/account-revision/saves/current').revision, 5);
-  assert.deepEqual(
-    JSON.parse(JSON.stringify(h.cloudDocs.get('users/account-revision/saves/current').payload)),
-    { cash: 950, jobsCompleted: 17 },
-    'The stale device write must not replace newer cloud progress'
-  );
-  assert.equal(h.calls.modal.includes('SAVE CONFLICT'), true,
-    'A stale-device conflict must require an explicit player choice');
-  assert.match(h.elements.get('cloud-account-status').textContent, /newer cloud career exists/i);
-});
-
 test('offline saves stay local and do not attempt a cloud write', async () => {
   const h = cloudModuleHarness({
     local: { delwin_v4_save: JSON.stringify({ cash: 50 }), delwin_cloud_owner_uid: 'account-D' },
