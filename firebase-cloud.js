@@ -406,6 +406,13 @@ async function reconcile(user) {
         const cloudRevisionOnServer = Number.isSafeInteger(cloud.revision) ? cloud.revision : 0;
         const localRevision = Number.parseInt(localStorage.getItem(LOCAL_REVISION_KEY) || "0", 10) || 0;
         const localMatchesCloud = JSON.stringify(local.payload) === JSON.stringify(cloud.payload);
+        // A browser may have initialized only the default/tutorial career before
+        // auth restored. It is safe to archive that starter state and load the
+        // account's established cloud career without showing a false conflict.
+        if (cloudRevisionOnServer > localRevision && !localMatchesCloud && isStarterCareer(local.payload)) {
+          restoreCloudCareer(local, cloud, user.uid, "starter-save-before-cloud-refresh");
+          return;
+        }
         if (cloudRevisionOnServer > localRevision && !localMatchesCloud) {
           if (tryApplyNewerCloud(cloud, local)) {
             status("Your latest cloud career was restored in the background.");
