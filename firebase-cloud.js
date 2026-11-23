@@ -474,6 +474,60 @@ function watchCloud(user) {
   });
 }
 
+// Each authenticated account gets its own device-local career and sync metadata.
+// The shared legacy keys below are only the active-account working slot.
+function accountStorageKey(uid, suffix) { return `delwin_account_${uid}_${suffix}`; }
+function switchActiveAccountIfNeeded(user) {
+  const ownerUid = localStorage.getItem(OWNER_KEY);
+  if (!ownerUid || ownerUid === user.uid) return false;
+  const raw = localStorage.getItem(LOCAL_KEY);
+  try {
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Invalid local career");
+      // Archive the outgoing account before changing a single active key.
+      localStorage.setItem(accountStorageKey(ownerUid, "career"), raw);
+      localStorage.setItem(accountStorageKey(ownerUid, "revision"), localStorage.getItem(LOCAL_REVISION_KEY) || "0");
+      const baseline = localStorage.getItem(SYNCED_SNAPSHOT_KEY);
+      if (baseline) localStorage.setItem(accountStorageKey(ownerUid, "baseline"), baseline);
+      const outbox = readDurableOutbox();
+      if (outbox?.uid === ownerUid) localStorage.setItem(accountStorageKey(ownerUid, "outbox"), JSON.stringify(outbox));
+    }
+    const incomingCareer = localStorage.getItem(accountStorageKey(user.uid, "career"));
+    const incomingBaseline = localStorage.getItem(accountStorageKey(user.uid, "baseline"));
+    const incomingOutbox = localStorage.getItem(accountStorageKey(user.uid, "outbox"));
+    // Validate the incoming snapshot before installing it in the active slot.
+    if (incomingCareer) {
+      const parsedIncoming = JSON.parse(incomingCareer);
+      if (!parsedIncoming || typeof parsedIncoming !== "object" || Array.isArray(parsedIncoming)) throw new Error("Invalid saved career for this account");
+    }
+    if (raw) backupLocal(raw, "account-switch-" + ownerUid);
+    if (incomingCareer) {
+      localStorage.setItem(LOCAL_KEY, incomingCareer);
+      localStorage.setItem(OWNER_KEY, user.uid);
+      localStorage.setItem(LOCAL_REVISION_KEY, localStorage.getItem(accountStorageKey(user.uid, "revision")) || "0");
+      if (incomingBaseline) localStorage.setItem(SYNCED_SNAPSHOT_KEY, incomingBaseline);
+      else localStorage.removeItem(SYNCED_SNAPSHOT_KEY);
+    } else {
+      localStorage.removeItem(LOCAL_KEY);
+      localStorage.removeItem(OWNER_KEY);
+      localStorage.removeItem(LOCAL_REVISION_KEY);
+      localStorage.removeItem(SYNCED_SNAPSHOT_KEY);
+    }
+    localStorage.removeItem(OUTBOX_KEY);
+    if (incomingOutbox) {
+      const parsedOutbox = JSON.parse(incomingOutbox);
+      if (parsedOutbox?.uid === user.uid) localStorage.setItem(OUTBOX_KEY, incomingOutbox);
+    }
+    status("Switched accounts. Loading this account's saved career…");
+    location.reload();
+    return true;
+  } catch (error) {
+    status("Account switch paused because the current career could not be safely separated. No career was intentionally replaced. " + error.message, true);
+    return true;
+  }
+}
+
 async function reconcile(user) {
   if (reconcilingUids.has(user.uid)) return;
   reconcilingUids.add(user.uid);
@@ -848,6 +902,7 @@ onAuthStateChanged(auth, user => {
       reconciliationRetryPending = false;
     }
     currentUser = user;
+    if (user && switchActiveAccountIfNeeded(user)) return;
     syncReady = false;
     const signedOut = document.getElementById("cloud-signed-out");
     const signedIn = document.getElementById("cloud-signed-in");
