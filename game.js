@@ -298,17 +298,54 @@ function loadState() {
   }
 }
 
-function saveState() {
+function saveState(checkpointType = 'gameplay') {
   try {
     // During an accepted cloud restore, Firebase owns the save decision.
     // Do not let startup normalization or boot-time mutations overwrite it.
     if (window.DelWinCloud?.isRestorePending?.()) return;
     localStorage.setItem('delwin_v4_save', JSON.stringify(state));
     if (window.DelWinCloud && typeof window.DelWinCloud.queueSave === 'function') {
-      window.DelWinCloud.queueSave(state);
+      window.DelWinCloud.queueSave(state, { checkpointType });
     }
   } catch (e) {}
 }
+
+// Cloud updates may be applied in-place only at a safe gameplay boundary.
+// Never replace an in-progress repair or a modal interaction.
+window.DelWinApplyCloudSave = function applyCloudSave(payload) {
+  try {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return false;
+    if (state.activeJob) return false;
+    const modal = document.getElementById('modal-overlay');
+    if (modal && !modal.classList.contains('hidden')) return false;
+    const incoming = JSON.parse(JSON.stringify(payload));
+    const savedTools = incoming.tools && typeof incoming.tools === 'object' ? incoming.tools : null;
+    delete incoming.tools;
+    Object.assign(state, incoming);
+    if (savedTools) {
+      Object.keys(state.tools || {}).forEach((key) => {
+        if (savedTools[key] && Number.isFinite(savedTools[key].level)) {
+          state.tools[key].level = Math.max(1, Math.min(24, Math.floor(savedTools[key].level)));
+        }
+      });
+    }
+    if (!Array.isArray(state.jobs)) state.jobs = [];
+    if (!Array.isArray(state.ratings) || state.ratings.length === 0) state.ratings = [5.0];
+    if (!state.customerLedger || typeof state.customerLedger !== 'object' || Array.isArray(state.customerLedger)) state.customerLedger = {};
+    localStorage.setItem('delwin_v4_save', JSON.stringify(state));
+    try { updateHUD(); } catch (e) {}
+    try { renderJobs(); } catch (e) {}
+    const activePage = document.querySelector('.page.active');
+    const pageId = activePage?.id?.replace(/^page-/, '');
+    if (pageId) {
+      try { goPage(pageId); } catch (e) {}
+    }
+    try { updateHUD(); } catch (e) {}
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
 
 function syncPoolRecharge(countKey, tsKey, maxVal, intervalMs) {
   if (state[countKey] >= maxVal) {
@@ -2480,7 +2517,7 @@ function completeJob() {
   state.ratings.push(jobRating);
   if (state.ratings.length > 15) state.ratings.shift();
   if (state.jobs.length < 2) refreshJobs();
-  saveState();
+  saveState('job-complete');
   updateHUD();
 
   const logHtml = (job.penaltyLog || []).map((p) =>
