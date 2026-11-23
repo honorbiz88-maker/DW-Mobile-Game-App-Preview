@@ -1826,8 +1826,8 @@ test('each device records the cloud revision acknowledged by compare-and-set', (
 
 test("cloud sync indicator distinguishes device save from confirmed cloud backup", () => {
   assert.ok(cloudSource.includes("SAVED LOCALLY"));
-  assert.ok(firebaseSource.includes("OFFLINE — SYNC PENDING"));
-  assert.ok(firebaseSource.includes("SYNCING TO CLOUD"));
-  assert.ok(firebaseSource.includes("CLOUD SYNCED"));
+  assert.ok(cloudSource.includes("OFFLINE — SYNC PENDING"));
+  assert.ok(cloudSource.includes("SYNCING TO CLOUD"));
+  assert.ok(cloudSource.includes("CLOUD SYNCED"));
   assert.ok(fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8").includes('id="cloud-sync-indicator"'));
 });
