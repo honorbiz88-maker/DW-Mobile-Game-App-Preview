@@ -549,8 +549,11 @@ async function reconcile(user) {
     // confirmed baseline proves this device has not changed since its last sync.
     if (local?.ownerUid === user.uid) {
       if (!cloud) {
+        persistDurableOutbox(user.uid, local.payload, "rebuild-missing-cloud-backup");
+        await writeCloud(local.payload, user.uid, cloudRevision, { type: "rebuild-missing-cloud-backup" });
+        if (!currentUser || currentUser.uid !== user.uid) return;
+        clearDurableOutboxIfMatches(user.uid, local.payload);
         syncReady = true;
-        queueSave(local.payload, { checkpointType: "rebuild-missing-cloud-backup" });
         status("Cloud backup reconnected from this device's saved career.");
         return;
       }
@@ -597,9 +600,12 @@ async function reconcile(user) {
         // using the server's current revision as the compare-and-set baseline.
         localStorage.setItem(`delwin_cloud_backup_unbased_${user.uid}_${Date.now()}`, JSON.stringify(cloud));
         cloudRevision = cloudRevisionOnServer;
+        persistDurableOutbox(user.uid, local.payload, "local-first-baseline-recovery");
+        await writeCloud(local.payload, user.uid, cloudRevision, { type: "local-first-baseline-recovery" });
+        if (!currentUser || currentUser.uid !== user.uid) return;
+        clearDurableOutboxIfMatches(user.uid, local.payload);
         syncReady = true;
-        queueSave(local.payload, { checkpointType: "local-first-baseline-recovery" });
-        status("This device's career remains active. Its previous cloud copy was preserved while the device backup reconnects.");
+        status("This device's career remains active. Its previous cloud copy was preserved and the device backup is reconnected.");
         return;
       }
 
