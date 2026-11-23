@@ -862,7 +862,7 @@ function claimContract() {
   const contractCareerGear = state.contractsCompleted % 6 === 0 ? 1 : 0;
   if (contractCareerGear) state.parts += contractCareerGear;
   rollNewContract();
-  saveState();
+  saveState('milestone');
   updateHUD();
   renderContractBanner();
   openModal(`
@@ -2587,7 +2587,7 @@ function buyStock(type) {
       return;
     }
   }
-  saveState();
+  saveState('purchase');
   updateHUD();
 }
 
@@ -2631,7 +2631,7 @@ function purchaseRigTier(tierNum) {
   state.parts -= rig.partCost;
   state.unlockedRigTier = tierNum;
   SoundFX.success();
-  saveState();
+  saveState('upgrade');
   updateHUD();
   renderGarage();
   openModal(`
@@ -2797,7 +2797,7 @@ function upgradeTool(key) {
   const newOwnedTier = Math.min(6, Math.floor((tool.level - 1) / 4) + 1);
   previewToolTiers[key] = newOwnedTier;
   SoundFX.success();
-  saveState();
+  saveState('upgrade');
   updateHUD();
   renderGarage();
 }
