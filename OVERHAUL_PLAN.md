@@ -158,6 +158,14 @@ Interpretation:
 - Rough and poor execution fall well short of the full 75-Gear target by 2,600 calls. The Gear economy becomes a meaningful long-run gate for lower-performance players; the poor case takes roughly 11,600 calls in this model. This is a material balancing risk to review in playtesting, not a reason to immediately restore the old generous rewards.
 - A player who never claims the first completed contract blocks all subsequent contracts. In that case the contract Gear stream stops entirely; career milestones and occasional clean streaks alone cannot support full progression. The claim action must remain highly visible and should be tested on mobile.
 
+
+### Contract claim usability guard — 2026-11-23
+
+- The Dispatch contract card now has a high-contrast completed state, an explicit live status message, and a full-width 48px minimum-height claim button.
+- Claiming immediately assigns the next contract and persists the reward checkpoint.
+- A regression test now protects this mobile claim affordance against accidental removal or loss of accessibility signaling.
+- This is a UI safeguard, not evidence of real-device usability. Mobile touch/layout playtesting remains required.
+
 ### Current conclusions
 
 - The verified full tool-plus-rig cash requirement is **$2,532,730** with the established discounts restored.
