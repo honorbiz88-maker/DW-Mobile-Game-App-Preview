@@ -827,7 +827,7 @@ window.addEventListener("online", () => {
   const uid = currentUser.uid;
   clearTimeout(syncTimer);
   syncTimer = null;
-  void flushPendingSave(uid);
+  return flushPendingSave(uid);
 });
 accountCard();
 
