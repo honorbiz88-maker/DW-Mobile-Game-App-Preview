@@ -82,7 +82,7 @@ test('account sign-in never replaces a different established local career', () =
 test('local gameplay saves remain independent from cloud connectivity', () => {
   const save = extractFunction('saveState');
   assert.match(save, /localStorage\.setItem\('delwin_v4_save', JSON\.stringify\(state\)\)/);
-  assert.match(save, /DelWinCloud\?\.queueSave/);
+  assert.match(save, /window\.DelWinCloud\.queueSave/);
   assert.match(save, /reportLocalSaveError/);
   assert.doesNotMatch(save, /await |getDoc|runTransaction/);
 });
