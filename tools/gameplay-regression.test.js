@@ -1711,16 +1711,16 @@ test('mobile interaction targets, viewport, and touch cancellation safeguards st
 
 test('linked devices observe cloud revisions and protect both careers on true conflicts', () => {
   assert.match(cloudSource, /onSnapshot, runTransaction/);
-  assert.match(cloudSource, /function watchCloud\\(user\\)/);
+  assert.match(cloudSource, /function watchCloud\(user\)/);
   assert.match(cloudSource, /revision <= lastObservedCloudRevision/);
-  assert.match(cloudSource, /showConflict\\(local\\.raw, cloud, local\\.ownerUid\\)/);
-  assert.match(cloudSource, /save\\/revision-conflict/);
-  assert.match(cloudSource, /cloudWatchUnsubscribe\\?\\.\\(\\)/);
+  assert.match(cloudSource, /showConflict\(local\.raw, cloud, local\.ownerUid\)/);
+  assert.match(cloudSource, /save\/revision-conflict/);
+  assert.match(cloudSource, /cloudWatchUnsubscribe\?\.\(\)/);
 });
 
 test('each device records the cloud revision acknowledged by compare-and-set', () => {
   assert.match(cloudSource, /const LOCAL_REVISION_KEY = "delwin_cloud_revision"/);
-  assert.match(cloudSource, /localStorage\\.setItem\\(LOCAL_REVISION_KEY, String\\(nextRevision\\)\\)/);
-  assert.match(cloudSource, /localStorage\\.setItem\\(LOCAL_REVISION_KEY, String\\(revision\\)\\)/);
-  assert.match(cloudSource, /localStorage\\.setItem\\(SYNCED_SNAPSHOT_KEY, JSON\\.stringify\\(payload\\)\\)/);
+  assert.match(cloudSource, /localStorage\.setItem\(LOCAL_REVISION_KEY, String\(nextRevision\)\)/);
+  assert.match(cloudSource, /localStorage\.setItem\(LOCAL_REVISION_KEY, String\(revision\)\)/);
+  assert.match(cloudSource, /localStorage\.setItem\(SYNCED_SNAPSHOT_KEY, JSON\.stringify\(payload\)\)/);
 });
