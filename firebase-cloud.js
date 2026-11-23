@@ -418,7 +418,13 @@ function isRestorePending() {
 }
 window.DelWinCloud = { queueSave, keepLocal, keepCloud, signOut: () => signOut(auth), hasAccount: () => !!currentUser, isRestorePending, pendingConflict: null };
 window.addEventListener("online", () => {
-  if (currentUser) reconcile(currentUser);
+  // Reconnection only resumes the queued background write. Authentication
+  // reconciliation runs once when auth state changes, never on network events.
+  if (!currentUser || !syncReady || !navigator.onLine) return;
+  const uid = currentUser.uid;
+  clearTimeout(syncTimer);
+  syncTimer = null;
+  void flushPendingSave(uid);
 });
 accountCard();
 
