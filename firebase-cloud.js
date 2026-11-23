@@ -518,19 +518,21 @@ async function reconcile(user) {
       return;
     }
 
-    // A save owned by another account must never be uploaded to this account.
-    // When this account already has a valid cloud career, archive the old local
-    // copy and connect this browser to the signed-in account automatically.
+    // A career already linked to another account is never replaced during
+    // sign-in. Authentication identifies the cloud account; it does not grant
+    // permission to swap the active local career. Use a separate clean device
+    // for a different account, or return to the account that owns this career.
     if (local?.ownerUid && local.ownerUid !== user.uid) {
       if (snap.exists()) {
         const cloudData = snap.data();
         if (cloudData?.schemaVersion === SCHEMA_VERSION && cloudData.payload && typeof cloudData.payload === "object" && !Array.isArray(cloudData.payload)) {
-          restoreCloudCareer(local, cloudData, user.uid, `account-switch-${local.ownerUid}`);
+          showConflict(local.raw, cloudData, local.ownerUid);
+          status("This device career belongs to a different account. It has not been changed or uploaded. Use a separate browser/device for the signed-in account, or sign back into the account that owns this career.", true);
         } else {
-          status("This device's previous account save is preserved. The signed-in account's cloud save format is not recognized; nothing was changed.", true);
+          status("This device's previous account career is preserved. The signed-in account's cloud save format is not recognized; nothing was changed.", true);
         }
       } else {
-        status("This device has a save from another account, and this account has no cloud career yet. The old save is preserved; sign back into its original account or use a clean browser for this account.", true);
+        status("This device career belongs to another account. It remains untouched and will not be uploaded to this account. Sign back into its original account or use a separate browser/device.", true);
       }
       return;
     }
@@ -774,7 +776,15 @@ function isRestorePending() {
     return false;
   }
 }
-window.DelWinCloud = { queueSave, keepLocal, onSafeCheckpoint: processDeferredCloudUpdate, signOut: () => signOut(auth), hasAccount: () => !!currentUser, isRestorePending, pendingConflict: null };
+window.DelWinCloud = {
+  queueSave, keepLocal, onSafeCheckpoint: processDeferredCloudUpdate,
+  signOut: () => signOut(auth), hasAccount: () => !!currentUser, isRestorePending,
+  reportLocalSaveError(error) {
+    const detail = error?.message || "browser storage is unavailable";
+    status(`LOCAL SAVE FAILED: ${detail}. Stop making purchases or career changes until storage is available.`, true);
+  },
+  pendingConflict: null
+};
 window.addEventListener("online", () => {
   if (!currentUser || !navigator.onLine) return;
   // Retry only an authentication setup that previously failed. Healthy
