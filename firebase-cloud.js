@@ -614,11 +614,13 @@ async function reconcile(user) {
     // Account creation on a device with an existing guest career: link and back
     // up that career when this account has no cloud save yet.
     if (local && !cloud) {
-      // Claim the guest career before the first network write. If the request
-      // fails or the account changes mid-flight, another account cannot adopt it.
+      // Claim the guest career and persist the backup intent before attempting
+      // the first network write. A failed request must survive reload/offline.
       localStorage.setItem(OWNER_KEY, user.uid);
+      persistDurableOutbox(user.uid, local.payload, "initial-account-link");
       await writeCloud(local.payload, user.uid);
       if (!currentUser || currentUser.uid !== user.uid) return;
+      clearDurableOutboxIfMatches(user.uid, local.payload);
       syncReady = true;
       status("Your existing device career is now backed up to your account.");
       return;
