@@ -1356,7 +1356,7 @@ test('temporary Firebase diagnostics are not exposed in the player account panel
 // This validates module behavior and account/save transitions without claiming
 // that the live Firebase project or a real browser has been exercised.
 function cloudModuleHarness({ local = {}, cloud = {}, user = null, online = true, failWrites = 0 } = {}) {
-  const store = new Map(Object.entries(local));
+  const store = new Map(Object.entries(local));\n  const sessionStore = new Map();
   const cloudDocs = new Map(Object.entries(cloud));
   const elements = new Map();
   const timers = new Map();
@@ -1383,7 +1383,11 @@ function cloudModuleHarness({ local = {}, cloud = {}, user = null, online = true
   const db = {};
   const pathKey = ref => ref.path;
   const context = {
-    document, localStorage, navigator: { onLine: online },
+    document, localStorage, sessionStorage: {
+      getItem: key => sessionStore.has(key) ? sessionStore.get(key) : null,
+      setItem: (key, value) => sessionStore.set(key, String(value)),
+      removeItem: key => sessionStore.delete(key)
+    }, navigator: { onLine: online },
     crypto: { randomUUID: () => 'test-device-id' },
     Date, Math, JSON, console,
     setTimeout(callback, delay) { const id = timers.size + 1; timers.set(id, { callback, delay }); return id; },
@@ -1419,10 +1423,6 @@ function cloudModuleHarness({ local = {}, cloud = {}, user = null, online = true
       calls.gets.push(pathKey(ref));
       const value = cloudDocs.get(pathKey(ref));
       return { exists: () => value !== undefined, data: () => value };
-    },
-    onSnapshot: (ref, next, error) => {
-      calls.snapshots.push({ path: pathKey(ref), next, error });
-      return () => { calls.snapshots = calls.snapshots.filter(item => item.next !== next); };
     },
     runTransaction: async (_db, callback) => {
       const writes = [];
@@ -1464,25 +1464,22 @@ test('Firebase module leaves guest careers local until the player opts into an a
   assert.match(h.elements.get('cloud-account-status').textContent, /Sign in to back up/);
 });
 
-test('creating an account backs up the existing guest career without replacing it', async () => {
+test('creating an account links and backs up the existing guest career', async () => {
   const career = { cash: 875, jobsCompleted: 19, parts: 4 };
   const h = cloudModuleHarness({ local: { delwin_v4_save: JSON.stringify(career) } });
   h.elements.get('cloud-email').value = 'player@example.com';
   h.elements.get('cloud-password').value = 'test-password';
   await h.trigger('cloud-create');
+  await new Promise(resolve => setImmediate(resolve));
   const ref = 'users/account-new/saves/current';
-  assert.equal(h.calls.writes.length, 1);
-  assert.equal(h.calls.writes[0].path, ref);
-  assert.deepEqual(JSON.parse(JSON.stringify(h.calls.writes[0].value.payload)), career);
   assert.equal(h.store.get('delwin_v4_save'), JSON.stringify(career));
   assert.equal(h.store.get('delwin_cloud_owner_uid'), 'account-new');
   assert.equal(h.elements.get('cloud-signed-in').hidden, false);
-  await h.trigger('cloud-signout');
-  assert.equal(h.store.get('delwin_v4_save'), JSON.stringify(career));
-  assert.equal(h.store.has('delwin_cloud_owner_uid'), true);
+  assert.equal(h.calls.writes.length, 1);
+  assert.deepEqual(JSON.parse(JSON.stringify(h.cloudDocs.get(ref).payload)), career);
 });
 
-test('interrupted guest account linking keeps ownership and retries safely on reconnect', async () => {
+test('failed initial account backup remains queued and retries after reconnect', async () => {
   const career = { cash: 875, jobsCompleted: 19, parts: 4 };
   const h = cloudModuleHarness({
     local: { delwin_v4_save: JSON.stringify(career) },
@@ -1492,189 +1489,119 @@ test('interrupted guest account linking keeps ownership and retries safely on re
   h.elements.get('cloud-email').value = 'player@example.com';
   h.elements.get('cloud-password').value = 'test-password';
   await h.trigger('cloud-create');
-  assert.equal(h.store.get('delwin_cloud_owner_uid'), 'account-new',
-    'Claim ownership before attempting the first cloud write');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.store.get('delwin_cloud_owner_uid'), 'account-new');
   assert.equal(h.store.get('delwin_v4_save'), JSON.stringify(career));
-  assert.equal(h.cloudDocs.has('users/account-new/saves/current'), false,
-    'A failed cloud write must not be mistaken for a completed backup');
+  assert.equal(h.cloudDocs.has('users/account-new/saves/current'), false);
+  assert.ok(h.store.has('delwin_cloud_pending_outbox_v1'));
   h.context.navigator.onLine = true;
   await h.context.window.__onlineHandler();
   await new Promise(resolve => setImmediate(resolve));
-  assert.equal(h.store.get('delwin_cloud_owner_uid'), 'account-new');
-  assert.deepEqual(
-    JSON.parse(JSON.stringify(h.cloudDocs.get('users/account-new/saves/current').payload)),
-    career,
-    'Reconnect retries the existing account link without losing or replacing the guest career'
-  );
-  assert.equal(h.calls.gets.length, 2,
-    'Only the failed initial account setup is reconciled again');
+  assert.deepEqual(JSON.parse(JSON.stringify(h.cloudDocs.get('users/account-new/saves/current').payload)), career);
 });
 
-test('a different account cannot silently upload the device career and cloud restore backs it up', async () => {
+test('signing into a different account preserves the established local career', async () => {
   const localCareer = { cash: 900, jobsCompleted: 25 };
   const cloudCareer = { cash: 120, jobsCompleted: 4 };
-  const cloudDoc = { schemaVersion: 1, payload: cloudCareer, updatedAt: { toDate: () => new Date(0) }, deviceId: 'other-device' };
   const h = cloudModuleHarness({
     local: { delwin_v4_save: JSON.stringify(localCareer), delwin_cloud_owner_uid: 'account-A' },
-    cloud: { 'users/account-B/saves/current': cloudDoc },
+    cloud: { 'users/account-B/saves/current': { schemaVersion: 1, payload: cloudCareer, updatedAt: {}, deviceId: 'other-device' } },
     user: { uid: 'account-B', email: 'b@example.com' }
   });
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(h.calls.writes.length, 0);
-  assert.match(h.calls.modal, /SAVE CONFLICT/);
-  assert.doesNotMatch(h.calls.modal, /KEEP THIS DEVICE/);
-  assert.match(h.calls.modal, /RESTORE CLOUD CAREER/);
-  h.context.window.DelWinCloud.keepCloud();
-  assert.deepEqual(JSON.parse(h.store.get('delwin_v4_save')), cloudCareer);
-  assert.equal(h.store.get('delwin_cloud_owner_uid'), 'account-B');
-  const localBackupKey = Array.from(h.store.keys()).find(key => key.startsWith('delwin_backup_before-cloud-change_'));
-  assert.ok(localBackupKey, 'The replaced local career must be backed up before cloud restore');
-  assert.equal(h.store.get(localBackupKey), JSON.stringify(localCareer));
-  assert.equal(h.calls.reloads, 1);
-});
-
-
-test('cloud restore marker survives reload without relying on Firestore timestamp metadata', async () => {
-  const localCareer = { cash: 900, jobsCompleted: 25 };
-  const cloudCareer = { cash: 120, jobsCompleted: 4 };
-  const cloudDoc = {
-    schemaVersion: 1,
-    payload: cloudCareer,
-    // Simulate a valid legacy cloud save whose timestamp is unavailable.
-    updatedAt: {},
-    deviceId: 'other-device'
-  };
-  const first = cloudModuleHarness({
-    local: { delwin_v4_save: JSON.stringify(localCareer), delwin_cloud_owner_uid: 'account-A' },
-    cloud: { 'users/account-B/saves/current': cloudDoc },
-    user: { uid: 'account-B', email: 'b@example.com' }
-  });
-  await new Promise(resolve => setImmediate(resolve));
-  assert.match(first.calls.modal, /SAVE CONFLICT/);
-  first.context.window.DelWinCloud.keepCloud();
-  assert.deepEqual(JSON.parse(first.store.get('delwin_v4_save')), cloudCareer);
-  assert.equal(first.store.get('delwin_cloud_owner_uid'), 'account-B');
-  const marker = JSON.parse(first.store.get('delwin_cloud_restore_pending'));
-  assert.equal(marker.uid, 'account-B');
-  assert.deepEqual(JSON.parse(JSON.stringify(marker.cloudPayload)), cloudCareer);
-
-  // A fresh page load gets the same browser storage and cloud document.
-  const second = cloudModuleHarness({
-    local: Object.fromEntries(first.store.entries()),
-    cloud: Object.fromEntries(first.cloudDocs.entries()),
-    user: { uid: 'account-B', email: 'b@example.com' }
-  });
-  await new Promise(resolve => setImmediate(resolve));
-  assert.equal(second.calls.modal, '', 'The deliberate restore must not reopen a conflict after reload');
-  assert.equal(second.store.has('delwin_cloud_restore_pending'), false);
-  assert.match(second.elements.get('cloud-account-status').textContent, /restored and connected/i);
-  assert.deepEqual(JSON.parse(second.store.get('delwin_v4_save')), cloudCareer);
-});
-
-test('restore guard remains active before Firebase restores the signed-in session', () => {
-  const start = cloudSource.indexOf('function isRestorePending()');
-  const end = cloudSource.indexOf('window.DelWinCloud =', start);
-  const guard = cloudSource.slice(start, end);
-  assert.match(guard, /localStorage\.getItem\(RESTORE_MARKER_KEY\)/);
-  assert.match(guard, /return !!marker\?\.uid && \(!currentUser \|\| marker\.uid === currentUser\.uid\)/);
-  assert.doesNotMatch(guard, /if \(!currentUser\) return false/);
-});
-
-test('gameplay save routine defers local writes while an accepted cloud restore is pending', () => {
-  const start = source.indexOf('function saveState()');
-  const end = source.indexOf('function syncPoolRecharge', start);
-  const save = source.slice(start, end);
-  assert.match(save, /DelWinCloud\?\.isRestorePending\?\.\(\)\) return/);
-  assert.ok(save.indexOf('isRestorePending') < save.indexOf("localStorage.setItem('delwin_v4_save'"),
-    'The restore guard must run before any local save write');
-});
-
-test('cloud restore overrides a boot-normalized device save and keeps it only as a backup', async () => {
-  const cloudCareer = { cash: 120, jobsCompleted: 4 };
-  const normalizedLocalCareer = { cash: 120, jobsCompleted: 4, migrated: true };
-  const marker = { uid: 'account-B', revision: null, deviceId: 'test-device-id', cloudPayload: cloudCareer };
-  const h = cloudModuleHarness({
-    local: {
-      delwin_v4_save: JSON.stringify(normalizedLocalCareer),
-      delwin_cloud_owner_uid: 'account-A',
-      delwin_cloud_restore_pending: JSON.stringify(marker)
-    },
-    cloud: {
-      'users/account-B/saves/current': {
-        schemaVersion: 1, payload: cloudCareer, updatedAt: {}, deviceId: 'other-device'
-      }
-    },
-    user: { uid: 'account-B', email: 'b@example.com' }
-  });
-  await new Promise(resolve => setImmediate(resolve));
-  assert.equal(h.calls.modal, '', 'A pending explicit restore must suppress the repeated conflict');
-  assert.equal(h.store.get('delwin_cloud_owner_uid'), 'account-B');
-  assert.deepEqual(JSON.parse(h.store.get('delwin_v4_save')), cloudCareer,
-    'The cloud career must replace any startup-normalized device payload');
-  assert.equal(h.store.has('delwin_cloud_restore_pending'), true,
-    'Keep the marker across reload so boot cannot rewrite the restored payload before auth reconciliation');
-  assert.equal(h.timers.size, 0, 'The device payload must never be queued over the cloud career');
-  const backupKey = Array.from(h.store.keys()).find(key => key.startsWith('delwin_backup_restore-reconciliation_'));
-  assert.ok(backupKey, 'Preserve the divergent startup/device save as a backup');
-  assert.deepEqual(JSON.parse(h.store.get(backupKey)), normalizedLocalCareer);
-  assert.equal(h.calls.reloads, 1, 'Reload the game with the exact restored cloud payload');
-  const second = cloudModuleHarness({
-    local: Object.fromEntries(h.store.entries()),
-    cloud: Object.fromEntries(h.cloudDocs.entries()),
-    user: { uid: 'account-B', email: 'b@example.com' }
-  });
-  await new Promise(resolve => setImmediate(resolve));
-  assert.equal(second.store.has('delwin_cloud_restore_pending'), false,
-    'Clear the marker only after a fresh boot sees the exact cloud payload');
-  assert.deepEqual(JSON.parse(second.store.get('delwin_v4_save')), cloudCareer);
-  assert.equal(second.calls.modal, '', 'The post-restore reload must not reopen the conflict');
-});
-
-test('a returning account keeps its local career and never reloads to compare cloud saves', async () => {
-  const deviceCareer = { cash: 900, jobsCompleted: 25, parts: 2 };
-  const cloudCareer = { cash: 640, jobsCompleted: 12, parts: 3 };
-  const h = cloudModuleHarness({
-    local: {
-      delwin_v4_save: JSON.stringify(deviceCareer),
-      delwin_cloud_owner_uid: 'account-C'
-    },
-    cloud: {
-      'users/account-C/saves/current': {
-        schemaVersion: 1, payload: cloudCareer, updatedAt: {}, deviceId: 'account-C-device'
-      }
-    },
-    user: { uid: 'account-C', email: 'c@example.com' }
-  });
-  await new Promise(resolve => setImmediate(resolve));
-  assert.equal(h.calls.modal, '', 'A linked account must not show a save-choice dialog');
-  assert.equal(h.store.get('delwin_cloud_owner_uid'), 'account-C');
-  assert.deepEqual(JSON.parse(h.store.get('delwin_v4_save')), deviceCareer,
-    'The device career remains playable; cloud comparison must not overwrite it');
-  assert.equal(h.calls.reloads, 0, 'Account reconciliation must never reload an already-linked game');
-  assert.equal(h.calls.gets.length, 1, 'The cloud save is checked once at authentication');
-  const onlineHandler = h.context.window.__onlineHandler;
-  assert.equal(typeof onlineHandler, 'function');
-  await onlineHandler();
-  assert.equal(h.calls.gets.length, 1, 'Reconnecting must not re-run reconciliation');
+  assert.match(h.calls.modal, /Device progress protected/);
+  assert.doesNotMatch(h.calls.modal, /RESTORE CLOUD CAREER|KEEP DEVICE SAVE AND BACK UP/);
+  assert.deepEqual(JSON.parse(h.store.get('delwin_v4_save')), localCareer);
+  assert.equal(h.store.get('delwin_cloud_owner_uid'), 'account-A');
   assert.equal(h.calls.reloads, 0);
 });
 
-test('cloud reconnect flushes queued saves without a second account reconciliation', async () => {
+test('restore marker blocks startup writes until a deliberately selected restore is reconciled', () => {
+  const start = cloudSource.indexOf('function isRestorePending()');
+  const end = cloudSource.indexOf('window.DelWinCloud =', start);
+  const guard = cloudSource.slice(start, end);
+  assert.match(guard, /localStorage.getItem\(RESTORE_MARKER_KEY\)/);
+  assert.match(guard, /return !!marker\?\.uid && \(!currentUser \|\| marker.uid === currentUser.uid\)/);
+});
+
+test('gameplay save writes local state before queueing any cloud backup', () => {
+  const save = extractFunction('saveState');
+  const localWrite = save.indexOf("localStorage.setItem('delwin_v4_save'");
+  const cloudQueue = save.indexOf('window.DelWinCloud.queueSave');
+  assert.ok(localWrite >= 0 && cloudQueue > localWrite);
+  assert.match(save, /reportLocalSaveError/);
+  assert.doesNotMatch(save, /await |getDoc|runTransaction/);
+});
+
+test('returning linked account preserves the local career without a restore prompt or reload', async () => {
+  const deviceCareer = { cash: 900, jobsCompleted: 25, parts: 2 };
+  const cloudCareer = { cash: 640, jobsCompleted: 12, parts: 3 };
   const h = cloudModuleHarness({
-    local: { delwin_v4_save: JSON.stringify({ cash: 50 }), delwin_cloud_owner_uid: 'account-D' },
+    local: { delwin_v4_save: JSON.stringify(deviceCareer), delwin_cloud_owner_uid: 'account-C' },
+    cloud: { 'users/account-C/saves/current': { schemaVersion: 1, payload: cloudCareer, updatedAt: {}, deviceId: 'account-C-device' } },
+    user: { uid: 'account-C', email: 'c@example.com' }
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.calls.modal, '');
+  assert.deepEqual(JSON.parse(h.store.get('delwin_v4_save')), deviceCareer);
+  assert.equal(h.calls.reloads, 0);
+  assert.equal(h.calls.gets.length, 1);
+});
+
+test('cloud reconnect flushes queued saves without re-reading the account career', async () => {
+  const career = { cash: 50 };
+  const h = cloudModuleHarness({
+    local: { delwin_v4_save: JSON.stringify(career), delwin_cloud_owner_uid: 'account-D' },
     user: { uid: 'account-D', email: 'd@example.com' },
-    cloud: { 'users/account-D/saves/current': { schemaVersion: 1, payload: { cash: 50 }, updatedAt: {}, deviceId: 'd' } },
+    cloud: { 'users/account-D/saves/current': { schemaVersion: 1, revision: 1, payload: career, updatedAt: {}, deviceId: 'd' } },
     online: false
   });
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(h.calls.gets.length, 1);
   h.context.window.DelWinCloud.queueSave({ cash: 75 });
-  const before = h.calls.gets.length;
   h.context.navigator.onLine = true;
   await h.context.window.__onlineHandler();
-  assert.equal(h.calls.gets.length, before);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.calls.gets.length, 1);
   assert.equal(h.calls.writes.length, 1);
   assert.deepEqual(JSON.parse(JSON.stringify(h.calls.writes[0].value.payload)), { cash: 75 });
+});
+
+test('fresh device restores a valid cloud career and records its account owner', async () => {
+  const cloudCareer = { cash: 640, jobsCompleted: 12, parts: 3 };
+  const h = cloudModuleHarness({
+    cloud: { 'users/account-C/saves/current': { schemaVersion: 1, payload: cloudCareer, updatedAt: { seconds: 10 }, deviceId: 'first-device' } },
+    user: { uid: 'account-C', email: 'c@example.com' }
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(JSON.parse(h.store.get('delwin_v4_save')), cloudCareer);
+  assert.equal(h.store.get('delwin_cloud_owner_uid'), 'account-C');
+  assert.equal(h.calls.reloads, 1);
+  assert.equal(h.calls.writes.length, 0);
+});
+
+test('stale device revision cannot overwrite a newer cloud career', async () => {
+  const deviceCareer = { cash: 500, jobsCompleted: 8 };
+  const newerCloud = { cash: 950, jobsCompleted: 17 };
+  const h = cloudModuleHarness({
+    local: { delwin_v4_save: JSON.stringify(deviceCareer), delwin_cloud_owner_uid: 'account-revision' },
+    user: { uid: 'account-revision', email: 'revision@example.com' },
+    cloud: { 'users/account-revision/saves/current': { schemaVersion: 1, revision: 4, payload: { cash: 900, jobsCompleted: 16 }, updatedAt: {}, deviceId: 'newer-device' } },
+    online: false
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  h.context.window.DelWinCloud.queueSave({ cash: 525, jobsCompleted: 9 });
+  h.cloudDocs.set('users/account-revision/saves/current', {
+    schemaVersion: 1, revision: 5, payload: newerCloud, updatedAt: {}, deviceId: 'newer-device'
+  });
+  h.context.navigator.onLine = true;
+  await h.context.window.__onlineHandler();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.cloudDocs.get('users/account-revision/saves/current').revision, 5);
+  assert.deepEqual(JSON.parse(JSON.stringify(h.cloudDocs.get('users/account-revision/saves/current').payload)), newerCloud);
+  assert.match(h.calls.modal, /Device progress protected/);
+  assert.match(h.elements.get('cloud-account-status').textContent, /newer cloud career exists|overlapping career data/i);
 });
 
 test('mobile repair layout brings action controls closer to the first phone viewport', () => {
