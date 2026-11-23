@@ -81,11 +81,15 @@ function accountCard() {
   create?.addEventListener("click", async () => {
     const { email, password } = credentials();
     if (!email || password.length < 6) return status("Enter a valid email and a password of at least 6 characters.", true);
+    // Preserve any guest career before linking a newly created account.
+    try { window.saveState?.("account-link"); } catch {}
     await runAuth(() => createUserWithEmailAndPassword(auth, email, password), "Creating account…", null, "Account creation");
   });
   signin?.addEventListener("click", async () => {
     const { email, password } = credentials();
     if (!email || !password) return status("Enter your email and password.", true);
+    // Flush the active game state locally before Firebase changes identity.
+    try { window.saveState?.("account-switch"); } catch {}
     await runAuth(() => signInWithEmailAndPassword(auth, email, password), "Signing in…", null, "Sign-in");
   });
   reset?.addEventListener("click", async () => {
@@ -94,6 +98,8 @@ function accountCard() {
     await runAuth(() => sendPasswordResetEmail(auth, email), "Sending password-reset email…", "Password-reset email sent. Check your inbox.", "Password reset");
   });
   signout?.addEventListener("click", async () => {
+    // Flush the active game state locally before Firebase changes identity.
+    try { window.saveState?.("account-switch"); } catch {}
     await runAuth(() => signOut(auth), "Signing out…", "Signed out. This device's local career is still saved.", "Sign-out");
   });
 }
