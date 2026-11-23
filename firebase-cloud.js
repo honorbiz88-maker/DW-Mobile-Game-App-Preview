@@ -95,6 +95,7 @@ function accountCard() {
     if (!email || !password) return status("Enter your email and password.", true);
     // Flush the active game state locally before Firebase changes identity.
     try { window.saveState?.("account-switch"); } catch {}
+    try { await window.DelWinCloud?.flushNow?.(); } catch {}
     await runAuth(() => signInWithEmailAndPassword(auth, email, password), "Signing in…", null, "Sign-in");
   });
   reset?.addEventListener("click", async () => {
@@ -105,6 +106,7 @@ function accountCard() {
   signout?.addEventListener("click", async () => {
     // Flush the active game state locally before Firebase changes identity.
     try { window.saveState?.("account-switch"); } catch {}
+    try { await window.DelWinCloud?.flushNow?.(); } catch {}
     await runAuth(() => signOut(auth), "Signing out…", "Signed out. This device's local career is still saved.", "Sign-out");
   });
 }
@@ -771,11 +773,11 @@ function pendingBelongsToUser(pending, user) {
   return !!pending && !!user && pending.uid === user.uid;
 }
 async function flushPendingSave(expectedUid) {
-  if (writing) return;
-  if (!pendingBelongsToUser(pendingPayload, currentUser) || currentUser.uid !== expectedUid || !syncReady || !navigator.onLine) return;
+  if (writing) return false;
+  if (!pendingBelongsToUser(pendingPayload, currentUser) || currentUser.uid !== expectedUid || !syncReady || !navigator.onLine) return false;
   if (busy) {
     syncTimer = setTimeout(() => flushPendingSave(expectedUid), 250);
-    return;
+    return false;
   }
   writing = true;
   setSyncState("syncing");
@@ -793,7 +795,9 @@ async function flushPendingSave(expectedUid) {
       clearDurableOutboxIfMatches(expectedUid, next);
       setSyncState("synced");
       status("Cloud save synced.");
+      return true;
     }
+    return false;
   } catch (error) {
     if (error.code === "save/revision-conflict" && currentUser?.uid === expectedUid) {
       // Stop automatic writes and present both copies. A player must explicitly
@@ -803,7 +807,7 @@ async function flushPendingSave(expectedUid) {
       let conflictShown = false;
       try {
         const latest = await getDoc(doc(db, "users", expectedUid, "saves", "current"));
-        if (currentUser?.uid !== expectedUid) return;
+        if (currentUser?.uid !== expectedUid) return false;
         const cloudData = latest.exists() ? latest.data() : null;
         if (cloudData?.payload && typeof cloudData.payload === "object" && !Array.isArray(cloudData.payload)) {
           cloudRevision = Number.isSafeInteger(cloudData.revision) ? cloudData.revision : 0;
@@ -832,6 +836,7 @@ async function flushPendingSave(expectedUid) {
     } else if (currentUser?.uid === expectedUid) {
       status(`Cloud sync paused: ${error.message}. Your local career is safe.`, true);
     }
+    return false;
   } finally {
     writing = false;
     if (currentUser && syncReady && navigator.onLine && pendingBelongsToUser(pendingPayload, currentUser)) {
@@ -870,11 +875,19 @@ function queueSave(payload, metadata = {}) {
   const delay = immediateCheckpoints.has(checkpointType) ? 0 : 250;
   syncTimer = setTimeout(() => flushPendingSave(queuedUid), delay);
 }
-function flushNow() {
+async function flushNow(maxWaitMs = 3500) {
   clearTimeout(syncTimer);
   syncTimer = null;
-  if (!currentUser || !syncReady || !navigator.onLine) return Promise.resolve(false);
-  return flushPendingSave(currentUser.uid);
+  if (!currentUser || !syncReady || !navigator.onLine) return false;
+  const uid = currentUser.uid;
+  const deadline = Date.now() + Math.max(0, Math.min(maxWaitMs, 5000));
+  // If a transaction is already in flight, give it a brief chance to receive
+  // its server acknowledgement before Firebase Auth changes the account.
+  while (writing && currentUser?.uid === uid && Date.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  if (writing || currentUser?.uid !== uid) return false;
+  return await flushPendingSave(uid) === true;
 }
 function isRestorePending() {
   try {
