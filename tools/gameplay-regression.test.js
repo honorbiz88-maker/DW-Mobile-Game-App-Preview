@@ -1361,7 +1361,7 @@ function cloudModuleHarness({ local = {}, cloud = {}, user = null, online = true
   const cloudDocs = new Map(Object.entries(cloud));
   const elements = new Map();
   const timers = new Map();
-  const calls = { gets: [], writes: [], reloads: 0, modal: '', listeners: {}, windowListeners: {}, snapshots: [] };
+  const calls = { gets: [], writes: [], transactions: 0, reloads: 0, modal: '', listeners: {}, windowListeners: {}, snapshots: [] };
   const elementIds = [
     'cloud-account-card', 'cloud-create', 'cloud-signin', 'cloud-reset', 'cloud-signout',
     'cloud-email', 'cloud-password', 'cloud-account-status', 'cloud-signed-out',
@@ -1426,6 +1426,7 @@ function cloudModuleHarness({ local = {}, cloud = {}, user = null, online = true
       return { exists: () => value !== undefined, data: () => value };
     },
     runTransaction: async (_db, callback) => {
+      calls.transactions += 1;
       const writes = [];
       const transaction = {
         get: async ref => {
@@ -1608,7 +1609,7 @@ test('stale device revision cannot overwrite a newer cloud career', async () => 
     for (const timer of scheduled) await timer.callback();
     await new Promise(resolve => setImmediate(resolve));
   }
-  assert.equal(h.calls.writes.length, 1, 'The queued save must attempt its compare-and-set write');
+  assert.equal(h.calls.transactions, 1, 'The queued save must attempt its compare-and-set transaction');
   assert.equal(h.cloudDocs.get('users/account-revision/saves/current').revision, 5);
   assert.deepEqual(JSON.parse(JSON.stringify(h.cloudDocs.get('users/account-revision/saves/current').payload)), newerCloud);
   assert.match(h.calls.modal, /Device progress protected/);
