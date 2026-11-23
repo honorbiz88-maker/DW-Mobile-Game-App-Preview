@@ -1437,7 +1437,7 @@ test('temporary Firebase diagnostics are not exposed in the player account panel
 // Execute the real cloud module against a deterministic Firebase/DOM harness.
 // This validates module behavior and account/save transitions without claiming
 // that the live Firebase project or a real browser has been exercised.
-function cloudModuleHarness({ local = {}, cloud = {}, user = null, online = true } = {}) {
+function cloudModuleHarness({ local = {}, cloud = {}, user = null, online = true, failWrites = 0 } = {}) {
   const store = new Map(Object.entries(local));
   const cloudDocs = new Map(Object.entries(cloud));
   const elements = new Map();
@@ -1500,6 +1500,7 @@ function cloudModuleHarness({ local = {}, cloud = {}, user = null, online = true
     },
     setDoc: async (ref, value) => {
       calls.writes.push({ path: pathKey(ref), value });
+      if (failWrites > 0) { failWrites -= 1; throw new Error('simulated offline write'); }
       cloudDocs.set(pathKey(ref), value);
     },
     serverTimestamp: () => ({ seconds: 123456 }),
@@ -1542,6 +1543,34 @@ test('creating an account backs up the existing guest career without replacing i
   await h.trigger('cloud-signout');
   assert.equal(h.store.get('delwin_v4_save'), JSON.stringify(career));
   assert.equal(h.store.has('delwin_cloud_owner_uid'), true);
+});
+
+test('interrupted guest account linking keeps ownership and retries safely on reconnect', async () => {
+  const career = { cash: 875, jobsCompleted: 19, parts: 4 };
+  const h = cloudModuleHarness({
+    local: { delwin_v4_save: JSON.stringify(career) },
+    failWrites: 1,
+    online: true
+  });
+  h.elements.get('cloud-email').value = 'player@example.com';
+  h.elements.get('cloud-password').value = 'test-password';
+  await h.trigger('cloud-create');
+  assert.equal(h.store.get('delwin_cloud_owner_uid'), 'account-new',
+    'Claim ownership before attempting the first cloud write');
+  assert.equal(h.store.get('delwin_v4_save'), JSON.stringify(career));
+  assert.equal(h.cloudDocs.has('users/account-new/saves/current'), false,
+    'A failed cloud write must not be mistaken for a completed backup');
+  h.context.navigator.onLine = true;
+  await h.context.window.__onlineHandler();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.store.get('delwin_cloud_owner_uid'), 'account-new');
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(h.cloudDocs.get('users/account-new/saves/current').payload)),
+    career,
+    'Reconnect retries the existing account link without losing or replacing the guest career'
+  );
+  assert.equal(h.calls.gets.length, 2,
+    'Only the failed initial account setup is reconciled again');
 });
 
 test('a different account cannot silently upload the device career and cloud restore backs it up', async () => {
