@@ -146,6 +146,44 @@ function backupLocal(raw, suffix = "before-cloud-change") {
   localStorage.setItem(key, raw);
   return key;
 }
+function isStarterCareer(payload) {
+  if (!payload || typeof payload !== "object") return false;
+  const toolLevels = payload.tools && typeof payload.tools === "object"
+    ? Object.values(payload.tools).every(tool => !tool || Number(tool.level) === 1)
+    : false;
+  const tutorialOnly = !payload.activeJob || payload.activeJob.isTutorial === true;
+  return payload.jobsCompleted === 0
+    && payload.cash === 140
+    && (payload.tokens === 8 || payload.tokens === 20)
+    && (payload.parts || 0) === 0
+    && (payload.rep || 0) === 0
+    && (payload.unlockedRigTier || 1) === 1
+    && payload.zoneId === "z1"
+    && payload.plugs === 4
+    && payload.stdTires === 2
+    && payload.hdTires === 1
+    && (payload.streak || 0) === 0
+    && (payload.contractsCompleted || 0) === 0
+    && (!payload.customerLedger || Object.keys(payload.customerLedger).length === 0)
+    && (!Array.isArray(payload.claimedCareerGearMilestones) || payload.claimedCareerGearMilestones.length === 0)
+    && (!Array.isArray(payload.jobs) || payload.jobs.length === 0)
+    && tutorialOnly
+    && toolLevels;
+}
+function restoreCloudCareer(local, cloudData, uid, backupSuffix) {
+  backupLocal(local.raw, backupSuffix);
+  const revision = Number.isSafeInteger(cloudData.revision) ? cloudData.revision : 0;
+  const payload = cloudData.payload;
+  localStorage.setItem(RESTORE_MARKER_KEY, JSON.stringify({
+    uid, revision, deviceId: getDeviceId(), cloudPayload: payload
+  }));
+  localStorage.setItem(LOCAL_KEY, JSON.stringify(payload));
+  localStorage.setItem(OWNER_KEY, uid);
+  localStorage.setItem(LOCAL_REVISION_KEY, String(revision));
+  localStorage.setItem(SYNCED_SNAPSHOT_KEY, JSON.stringify(payload));
+  status("This browser is being connected to your account's cloud career. Its previous local save has been backed up.");
+  location.reload();
+}
 function saveEnvelope(payload, revision, checkpoint = {}) {
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -330,18 +368,19 @@ async function reconcile(user) {
       return;
     }
 
-    // Never allow one account to claim another account's device career.
+    // A save owned by another account must never be uploaded to this account.
+    // When this account already has a valid cloud career, archive the old local
+    // copy and connect this browser to the signed-in account automatically.
     if (local?.ownerUid && local.ownerUid !== user.uid) {
       if (snap.exists()) {
         const cloudData = snap.data();
         if (cloudData?.schemaVersion === SCHEMA_VERSION && cloudData.payload && typeof cloudData.payload === "object" && !Array.isArray(cloudData.payload)) {
-          showConflict(local.raw, cloudData, local.ownerUid);
-          status("This device's career belongs to a different account. You may restore this account's cloud career; the device career will be backed up first.", true);
+          restoreCloudCareer(local, cloudData, user.uid, `account-switch-${local.ownerUid}`);
         } else {
-          status("This device's career belongs to a different account, and the cloud save format is not recognized. Nothing was changed.", true);
+          status("This device's previous account save is preserved. The signed-in account's cloud save format is not recognized; nothing was changed.", true);
         }
       } else {
-        status("This device's career belongs to a different account. Nothing was uploaded. Sign back into its original account or use another device for this account.", true);
+        status("This device has a save from another account, and this account has no cloud career yet. The old save is preserved; sign back into its original account or use a clean browser for this account.", true);
       }
       return;
     }
@@ -399,11 +438,18 @@ async function reconcile(user) {
       return;
     }
 
-    // An unlinked guest career and an existing account career are two distinct
-    // saves. Preserve both and ask only at this account-link boundary.
+    // Fresh browsers create a starter/tutorial save before Firebase auth finishes.
+    // That is not a second career: archive it and restore the existing account save.
+    if (local && cloud && isStarterCareer(local.payload)) {
+      restoreCloudCareer(local, cloud, user.uid, "starter-save-before-account-restore");
+      return;
+    }
+
+    // A meaningful unlinked guest career and an existing account career are
+    // genuinely different saves. Preserve both and ask only at this boundary.
     if (local && cloud) {
       showConflict(local.raw, cloud);
-      status("A device career and an account career both exist. Neither has been changed.", true);
+      status("A guest career and an account career both exist. Both copies are preserved until you choose.", true);
       return;
     }
 
