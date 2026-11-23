@@ -1704,6 +1704,7 @@ test('cloud reconnect flushes queued saves without a second account reconciliati
   assert.equal(h.calls.gets.length, 1);
   h.context.window.DelWinCloud.queueSave({ cash: 75 });
   const before = h.calls.gets.length;
+  h.context.navigator.onLine = true;
   await h.context.window.__onlineHandler();
   assert.equal(h.calls.gets.length, before);
   assert.equal(h.calls.writes.length, 1);
