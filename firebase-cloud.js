@@ -155,7 +155,7 @@ function listLocalBackups() {
       const raw = localStorage.getItem(key);
       const payload = JSON.parse(raw || "null");
       if (!payload || typeof payload !== "object" || Array.isArray(payload)) continue;
-      const timestampMatch = key.match(/_(\\d{10,})$/);
+      const timestampMatch = key.match(/_(\d{10,})$/);
       backups.push({
         key, raw, payload,
         timestamp: timestampMatch ? Number(timestampMatch[1]) : 0
@@ -204,13 +204,13 @@ async function recoverBackupFromPicker() {
   const select = document.getElementById("dw-backup-choice");
   const index = Number.parseInt(select?.value || "0", 10);
   const key = window.DelWinCloud.backupChoices?.[index];
-  if (!key || !/^delwin_backup_[a-zA-Z0-9_-]+_\\d{10,}$/.test(key)) return status("That backup selection is no longer available.", true);
+  if (!key || !/^delwin_backup_[a-zA-Z0-9_-]+_\d{10,}$/.test(key)) return status("That backup selection is no longer available.", true);
   const raw = localStorage.getItem(key);
   let payload;
   try { payload = JSON.parse(raw || "null"); } catch {}
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return status("The selected backup could not be read. No save was changed.", true);
   const summary = backupSummary(payload);
-  if (!window.confirm("Recover this device backup?\\nCash: " + summary.cash + "\\nStandard tires: " + summary.tires + "\\nJobs completed: " + summary.jobs + "\\n\\nYour current device and cloud saves will be backed up first. The selected backup will then replace the active career on this account.")) return;
+  if (!window.confirm("Recover this device backup?\nCash: " + summary.cash + "\nStandard tires: " + summary.tires + "\nJobs completed: " + summary.jobs + "\n\nYour current device and cloud saves will be backed up first. The selected backup will then replace the active career on this account.")) return;
   const uid = currentUser.uid;
   const local = localSnapshot();
   if (local && !local.invalid) backupLocal(local.raw, "before-backup-recovery");
