@@ -18,6 +18,7 @@ const firebaseConfig = {
 
 const LOCAL_KEY = "delwin_v4_save";
 const OWNER_KEY = "delwin_cloud_owner_uid";
+const LOCAL_REVISION_KEY = "delwin_cloud_revision";
 const RESTORE_MARKER_KEY = "delwin_cloud_restore_pending";
 const SCHEMA_VERSION = 1;
 const app = initializeApp(firebaseConfig);
@@ -194,7 +195,10 @@ async function writeCloud(payload, expectedUid = currentUser?.uid, expectedRevis
     }
     transaction.set(ref, saveEnvelope(payload, nextRevision));
   });
-  if (currentUser?.uid === expectedUid) cloudRevision = nextRevision;
+  if (currentUser?.uid === expectedUid) {
+    cloudRevision = nextRevision;
+    if (localStorage.getItem(OWNER_KEY) === expectedUid) localStorage.setItem(LOCAL_REVISION_KEY, String(nextRevision));
+  }
   return nextRevision;
 }
 async function reconcile(user) {
@@ -235,6 +239,7 @@ async function reconcile(user) {
         location.reload();
       } else {
         localStorage.removeItem(RESTORE_MARKER_KEY);
+        localStorage.setItem(LOCAL_REVISION_KEY, String(Number.isSafeInteger(snap.data()?.revision) ? snap.data().revision : cloudRevision));
         syncReady = true;
         status("Cloud career restored and connected.");
       }
@@ -275,6 +280,17 @@ async function reconcile(user) {
         if (!currentUser || currentUser.uid !== user.uid) return;
         status("Cloud backup reconnected from this device's saved career.");
       } else {
+        const cloudRevisionOnServer = Number.isSafeInteger(cloud.revision) ? cloud.revision : 0;
+        const localRevision = Number.parseInt(localStorage.getItem(LOCAL_REVISION_KEY) || "0", 10) || 0;
+        const localMatchesCloud = JSON.stringify(local.payload) === JSON.stringify(cloud.payload);
+        if (cloudRevisionOnServer > localRevision && !localMatchesCloud) {
+          showConflict(local.raw, cloud, local.ownerUid);
+          status("A newer career was saved on another device. Choose which copy to keep; neither has been changed.", true);
+          return;
+        }
+        if (localMatchesCloud || cloudRevisionOnServer === localRevision) {
+          localStorage.setItem(LOCAL_REVISION_KEY, String(cloudRevisionOnServer));
+        }
         status("Cloud backup connected · this device is ready.");
       }
       syncReady = true;
@@ -307,6 +323,7 @@ async function reconcile(user) {
     if (!local && cloud) {
       localStorage.setItem(LOCAL_KEY, JSON.stringify(cloud.payload));
       localStorage.setItem(OWNER_KEY, user.uid);
+      localStorage.setItem(LOCAL_REVISION_KEY, String(Number.isSafeInteger(cloud.revision) ? cloud.revision : 0));
       status("Cloud career restored to this device.");
       location.reload();
       return;
@@ -362,6 +379,7 @@ function keepCloud() {
     }));
     localStorage.setItem(LOCAL_KEY, JSON.stringify(pending.cloudData.payload));
     localStorage.setItem(OWNER_KEY, currentUser.uid);
+    localStorage.setItem(LOCAL_REVISION_KEY, String(Number.isSafeInteger(pending.cloudData.revision) ? pending.cloudData.revision : cloudRevision));
     window.DelWinCloud.pendingConflict = null;
     syncReady = true;
     window.closeModal?.();
