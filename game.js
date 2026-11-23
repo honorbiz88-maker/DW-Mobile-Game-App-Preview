@@ -321,6 +321,10 @@ function saveState(checkpointType = 'gameplay') {
   }
 }
 
+// Account controls live in the cloud module; expose the synchronous local-first
+// checkpoint so sign-in, account creation, and sign-out can preserve live state.
+window.saveState = saveState;
+
 function flushPendingSaveAfterWriterLock() {
   if (window.__delwinWriterTab !== true || !window.__delwinPendingSaveCheckpoint) return;
   const checkpointType = window.__delwinPendingSaveCheckpoint;
