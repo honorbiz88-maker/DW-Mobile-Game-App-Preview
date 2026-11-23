@@ -87,6 +87,40 @@ test('local gameplay saves remain independent from cloud connectivity', () => {
   assert.doesNotMatch(save, /await |getDoc|runTransaction/);
 });
 
+test('standard tire purchase deducts cash and persists inventory in the same local-first checkpoint', () => {
+  const state = { cash: 200, stdTires: 0, hdTires: 0, plugs: 0 };
+  const saves = [];
+  let hudUpdates = 0;
+  const purchase = gameFunction('buyStock', {
+    state,
+    getActiveRigObj: () => ({ name: 'Starter Rig', capStd: 3, capHd: 1, capPlugs: 6 }),
+    getStockPricing: () => ({ stdCost: 45, hdCost: 95, plugPackCost: 20, plugPackQty: 3 }),
+    SoundFX: { torqueClick: () => {} },
+    saveState: checkpoint => saves.push({ checkpoint, cash: state.cash, stdTires: state.stdTires }),
+    updateHUD: () => { hudUpdates += 1; },
+    showAlert: () => { throw new Error('Unexpected purchase alert'); }
+  });
+  purchase('std');
+  assert.equal(state.cash, 155);
+  assert.equal(state.stdTires, 1);
+  assert.deepEqual(saves, [{ checkpoint: 'purchase', cash: 155, stdTires: 1 }]);
+  assert.equal(hudUpdates, 1);
+});
+
+test('local storage failure is surfaced instead of silently treating gameplay as saved', () => {
+  let reported = null;
+  const errors = [];
+  const save = gameFunction('saveState', {
+    state: { cash: 100 },
+    window: { DelWinCloud: { reportLocalSaveError: error => { reported = error; } } },
+    localStorage: { setItem: () => { throw new Error('quota exceeded'); } },
+    console: { error: (...args) => errors.push(args) }
+  });
+  save();
+  assert.match(reported.message, /quota exceeded/);
+  assert.equal(errors.length, 1);
+});
+
 test('durable outbox is persisted before network work and cleared only after matching acknowledgement', () => {
   const queueStart = cloudSource.indexOf('function queueSave(');
   const queueEnd = cloudSource.indexOf('function isRestorePending()', queueStart);
