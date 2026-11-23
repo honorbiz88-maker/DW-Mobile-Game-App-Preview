@@ -1440,7 +1440,7 @@ function cloudModuleHarness({ local = {}, cloud = {}, user = null, online = true
   const cloudDocs = new Map(Object.entries(cloud));
   const elements = new Map();
   const timers = new Map();
-  const calls = { gets: [], writes: [], reloads: 0, modal: '', listeners: {} };
+  const calls = { gets: [], writes: [], reloads: 0, modal: '', listeners: {}, windowListeners: {} };
   const elementIds = [
     'cloud-account-card', 'cloud-create', 'cloud-signin', 'cloud-reset', 'cloud-signout',
     'cloud-email', 'cloud-password', 'cloud-account-status', 'cloud-signed-out',
@@ -1469,7 +1469,7 @@ function cloudModuleHarness({ local = {}, cloud = {}, user = null, online = true
     setTimeout(callback, delay) { const id = timers.size + 1; timers.set(id, { callback, delay }); return id; },
     clearTimeout(id) { timers.delete(id); },
     window: {
-      addEventListener() {},
+      addEventListener(type, callback) { calls.windowListeners[type] = callback; if (type === 'online') this.__onlineHandler = callback; },
       openModal(html) { calls.modal = html; },
       closeModal() { calls.modal = ''; }
     },
@@ -1662,7 +1662,7 @@ test('cloud restore overrides a boot-normalized device save and keeps it only as
   assert.equal(second.calls.modal, '', 'The post-restore reload must not reopen the conflict');
 });
 
-test('a returning player with a matching account owner automatically restores the cloud career without a conflict prompt', async () => {
+test('a returning account keeps its local career and never reloads to compare cloud saves', async () => {
   const deviceCareer = { cash: 900, jobsCompleted: 25, parts: 2 };
   const cloudCareer = { cash: 640, jobsCompleted: 12, parts: 3 };
   const h = cloudModuleHarness({
@@ -1678,23 +1678,34 @@ test('a returning player with a matching account owner automatically restores th
     user: { uid: 'account-C', email: 'c@example.com' }
   });
   await new Promise(resolve => setImmediate(resolve));
-  assert.equal(h.calls.modal, '', 'A returning player must not be asked to resolve the same device/cloud pair again');
+  assert.equal(h.calls.modal, '', 'A linked account must not show a save-choice dialog');
   assert.equal(h.store.get('delwin_cloud_owner_uid'), 'account-C');
-  assert.deepEqual(JSON.parse(h.store.get('delwin_v4_save')), cloudCareer,
-    'The account cloud career is the source of truth on launch');
-  const backupKey = Array.from(h.store.keys()).find(key => key.startsWith('delwin_backup_before-cloud-refresh_'));
-  assert.ok(backupKey, 'Preserve the divergent device copy before restoring cloud');
-  assert.deepEqual(JSON.parse(h.store.get(backupKey)), deviceCareer);
-  assert.equal(h.calls.reloads, 1, 'Reload once with the authoritative cloud career');
-  const second = cloudModuleHarness({
-    local: Object.fromEntries(h.store.entries()),
-    cloud: Object.fromEntries(h.cloudDocs.entries()),
-    user: { uid: 'account-C', email: 'c@example.com' }
+  assert.deepEqual(JSON.parse(h.store.get('delwin_v4_save')), deviceCareer,
+    'The device career remains playable; cloud comparison must not overwrite it');
+  assert.equal(h.calls.reloads, 0, 'Account reconciliation must never reload an already-linked game');
+  assert.equal(h.calls.gets.length, 1, 'The cloud save is checked once at authentication');
+  const onlineHandler = h.context.window.__onlineHandler;
+  assert.equal(typeof onlineHandler, 'function');
+  await onlineHandler();
+  assert.equal(h.calls.gets.length, 1, 'Reconnecting must not re-run reconciliation');
+  assert.equal(h.calls.reloads, 0);
+});
+
+test('cloud reconnect flushes queued saves without a second account reconciliation', async () => {
+  const h = cloudModuleHarness({
+    local: { delwin_v4_save: JSON.stringify({ cash: 50 }), delwin_cloud_owner_uid: 'account-D' },
+    user: { uid: 'account-D', email: 'd@example.com' },
+    cloud: { 'users/account-D/saves/current': { schemaVersion: 1, payload: { cash: 50 }, updatedAt: {}, deviceId: 'd' } },
+    online: false
   });
   await new Promise(resolve => setImmediate(resolve));
-  assert.equal(second.calls.modal, '', 'The next launch must not reopen a save-choice dialog');
-  assert.equal(second.calls.reloads, 0, 'A matching local cache should load without another reload');
-  assert.deepEqual(JSON.parse(second.store.get('delwin_v4_save')), cloudCareer);
+  assert.equal(h.calls.gets.length, 1);
+  h.context.window.DelWinCloud.queueSave({ cash: 75 });
+  const before = h.calls.gets.length;
+  await h.context.window.__onlineHandler();
+  assert.equal(h.calls.gets.length, before);
+  assert.equal(h.calls.writes.length, 1);
+  assert.deepEqual(JSON.parse(JSON.stringify(h.calls.writes[0].value.payload)), { cash: 75 });
 });
 
 test('mobile repair layout brings action controls closer to the first phone viewport', () => {
