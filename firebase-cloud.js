@@ -264,6 +264,77 @@ async function writeCloud(payload, expectedUid = currentUser?.uid, expectedRevis
   }
   return nextRevision;
 }
+function stableValue(value) {
+  if (Array.isArray(value)) return value.map(stableValue);
+  if (value && typeof value === "object") {
+    return Object.keys(value).sort().reduce((out, key) => {
+      out[key] = stableValue(value[key]);
+      return out;
+    }, {});
+  }
+  return value;
+}
+function sameValue(a, b) {
+  return JSON.stringify(stableValue(a)) === JSON.stringify(stableValue(b));
+}
+// Three-way merge only accepts independent field changes. If both devices
+// changed the same top-level field differently, preserve both saves and ask.
+function mergeCareerSaves(base, local, cloud) {
+  if (!base || !local || !cloud) return { ok: false, conflicts: ["unknown baseline"] };
+  const merged = {};
+  const conflicts = [];
+  const keys = new Set([...Object.keys(base), ...Object.keys(local), ...Object.keys(cloud)]);
+  for (const key of keys) {
+    const hasBase = Object.prototype.hasOwnProperty.call(base, key);
+    const hasLocal = Object.prototype.hasOwnProperty.call(local, key);
+    const hasCloud = Object.prototype.hasOwnProperty.call(cloud, key);
+    const b = hasBase ? base[key] : undefined;
+    const l = hasLocal ? local[key] : undefined;
+    const c = hasCloud ? cloud[key] : undefined;
+    const localChanged = hasBase !== hasLocal || !sameValue(b, l);
+    const cloudChanged = hasBase !== hasCloud || !sameValue(b, c);
+    if (!localChanged) {
+      if (hasCloud) merged[key] = c;
+    } else if (!cloudChanged || (hasLocal === hasCloud && sameValue(l, c))) {
+      if (hasLocal) merged[key] = l;
+    } else {
+      conflicts.push(key);
+    }
+  }
+  return conflicts.length ? { ok: false, conflicts } : { ok: true, payload: merged };
+}
+function readSyncedBaseline() {
+  try {
+    const value = JSON.parse(localStorage.getItem(SYNCED_SNAPSHOT_KEY) || "null");
+    return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+  } catch { return null; }
+}
+function applyMergedCareer(payload, revision, cloudData) {
+  cloudRevision = revision;
+  const apply = window.DelWinApplyCloudSave;
+  if (typeof apply === "function" && apply(payload)) {
+    deferredCloudUpdate = null;
+    localStorage.setItem(LOCAL_REVISION_KEY, String(revision));
+    status("Career changes from both devices were safely combined.");
+  } else {
+    deferredCloudUpdate = { ...cloudData, revision, mergedPayload: payload };
+    status("Changes from both devices were combined and will appear at the next safe gameplay checkpoint.");
+  }
+  pendingPayload = { uid: currentUser.uid, payload: JSON.parse(JSON.stringify(payload)), checkpoint: { type: "auto-merge" } };
+  syncReady = true;
+  clearTimeout(syncTimer);
+  const uid = currentUser.uid;
+  syncTimer = setTimeout(() => flushPendingSave(uid), 300);
+}
+function tryMergeConcurrentCareer(cloud, local) {
+  const baseline = readSyncedBaseline();
+  if (!baseline || !local?.payload || !cloud?.payload) return false;
+  const result = mergeCareerSaves(baseline, local.payload, cloud.payload);
+  if (!result.ok) return false;
+  const revision = Number.isSafeInteger(cloud.revision) ? cloud.revision : 0;
+  applyMergedCareer(result.payload, revision, cloud);
+  return true;
+}
 function tryApplyNewerCloud(cloud, local) {
   const payload = cloud?.payload;
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return false;
@@ -280,15 +351,26 @@ function tryApplyNewerCloud(cloud, local) {
 }
 function processDeferredCloudUpdate() {
   if (!deferredCloudUpdate || !currentUser || !syncReady) return;
-  const cloud = deferredCloudUpdate; deferredCloudUpdate = null;
+  const cloud = deferredCloudUpdate;
   const local = localSnapshot(); if (!local || local.invalid) return;
+  if (cloud.mergedPayload) {
+    const apply = window.DelWinApplyCloudSave;
+    if (typeof apply === "function" && apply(cloud.mergedPayload)) {
+      deferredCloudUpdate = null;
+      localStorage.setItem(LOCAL_REVISION_KEY, String(cloud.revision || 0));
+      status("Combined career changes are now active.");
+    }
+    return;
+  }
+  deferredCloudUpdate = null;
   const revision = Number.isSafeInteger(cloud.revision) ? cloud.revision : 0;
   const localRevision = Number.parseInt(localStorage.getItem(LOCAL_REVISION_KEY) || '0', 10) || 0;
   if (revision <= localRevision) return;
   if (tryApplyNewerCloud(cloud, local)) return;
+  if (tryMergeConcurrentCareer(cloud, local)) return;
   syncReady = false; pendingPayload = null; cloudRevision = revision;
   showConflict(local.raw, cloud, local.ownerUid);
-  status('Both devices have made progress. Both saves are preserved; choose which career to keep.', true);
+  status('Both devices changed the same career data. Both saves are preserved; choose which career to keep.', true);
 }
 function watchCloud(user) {
   if (cloudWatchUid === user.uid && cloudWatchUnsubscribe) return;
@@ -310,10 +392,11 @@ function watchCloud(user) {
     if (revision > localRevision && JSON.stringify(local.payload) !== JSON.stringify(cloud.payload)) {
       cloudRevision = revision;
       if (tryApplyNewerCloud(cloud, local)) return;
+      if (tryMergeConcurrentCareer(cloud, local)) return;
       syncReady = false;
       pendingPayload = null;
       showConflict(local.raw, cloud, local.ownerUid);
-      status("Both devices have made progress. Both saves are preserved; choose which career to keep.", true);
+      status("Both devices changed the same career data. Both saves are preserved; choose which career to keep.", true);
     } else if (JSON.stringify(local.payload) === JSON.stringify(cloud.payload)) {
       localStorage.setItem(LOCAL_REVISION_KEY, String(revision));
       cloudRevision = revision;
@@ -563,7 +646,6 @@ async function flushPendingSave(expectedUid) {
       // Stop automatic writes and present both copies. A player must explicitly
       // choose; an older/offline device can never silently replace newer cloud progress.
       syncReady = false;
-      pendingPayload = null;
       try {
         const latest = await getDoc(doc(db, "users", expectedUid, "saves", "current"));
         if (currentUser?.uid !== expectedUid) return;
@@ -571,7 +653,11 @@ async function flushPendingSave(expectedUid) {
         if (cloudData?.payload && typeof cloudData.payload === "object" && !Array.isArray(cloudData.payload)) {
           cloudRevision = Number.isSafeInteger(cloudData.revision) ? cloudData.revision : 0;
           const local = localSnapshot();
-          if (local && !local.invalid) showConflict(local.raw, cloudData, local.ownerUid);
+          if (local && !local.invalid && tryMergeConcurrentCareer(cloudData, local)) {
+            status("Your local changes and the newer cloud changes were combined. Syncing the combined career…");
+          } else if (local && !local.invalid) {
+            showConflict(local.raw, cloudData, local.ownerUid);
+          }
         }
       } catch {}
       status("A newer cloud career exists. Your device progress is safe; choose which career to keep before syncing again.", true);
