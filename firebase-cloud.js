@@ -205,34 +205,53 @@ async function recoverBackupFromPicker() {
   const index = Number.parseInt(select?.value || "0", 10);
   const key = window.DelWinCloud.backupChoices?.[index];
   if (!key || !/^delwin_backup_[a-zA-Z0-9_-]+_\\d{10,}$/.test(key)) return status("That backup selection is no longer available.", true);
-  if (window.DelWinApplyCloudSave && (window.DelWinApplyCloudSave.__unused)) return;
-  const modal = document.getElementById("modal-overlay");
-  const stateHasJob = !!window.gameState?.activeJob;
-  if (stateHasJob) return status("Finish the active job before recovering a previous career.", true);
   const raw = localStorage.getItem(key);
   let payload;
   try { payload = JSON.parse(raw || "null"); } catch {}
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return status("The selected backup could not be read. No save was changed.", true);
+  const summary = backupSummary(payload);
+  if (!window.confirm("Recover this device backup?\\nCash: " + summary.cash + "\\nStandard tires: " + summary.tires + "\\nJobs completed: " + summary.jobs + "\\n\\nYour current device and cloud saves will be backed up first. The selected backup will then replace the active career on this account.")) return;
+  const uid = currentUser.uid;
   const local = localSnapshot();
   if (local && !local.invalid) backupLocal(local.raw, "before-backup-recovery");
-  window.closeModal?.();
-  if (typeof window.DelWinApplyCloudSave !== "function" || !window.DelWinApplyCloudSave(payload)) {
-    status("The backup could not be safely applied. Your current save and the selected backup remain unchanged.", true);
-    return;
-  }
-  const uid = currentUser.uid;
+  let cloudBefore = null;
   try {
+    const latest = await getDoc(doc(db, "users", uid, "saves", "current"));
+    if (currentUser?.uid !== uid) return;
+    if (latest.exists()) {
+      cloudBefore = latest.data();
+      localStorage.setItem(`delwin_cloud_backup_${uid}_${Date.now()}`, JSON.stringify(cloudBefore));
+      cloudRevision = Number.isSafeInteger(cloudBefore.revision) ? cloudBefore.revision : 0;
+    }
+    // Write the selected payload with a transaction revision check BEFORE
+    // changing the active device save. A concurrent cloud update aborts safely.
+    syncReady = false;
+    clearTimeout(syncTimer);
+    syncTimer = null;
+    pendingPayload = null;
     await writeCloud(payload, uid, cloudRevision, {type:"manual-backup-recovery"});
     if (currentUser?.uid !== uid) return;
+    const revision = cloudRevision;
+    localStorage.setItem(RESTORE_MARKER_KEY, JSON.stringify({
+      uid, revision, deviceId: getDeviceId(), cloudPayload: payload
+    }));
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(payload));
     localStorage.setItem(OWNER_KEY, uid);
+    localStorage.setItem(LOCAL_REVISION_KEY, String(revision));
     localStorage.setItem(SYNCED_SNAPSHOT_KEY, JSON.stringify(payload));
-    localStorage.setItem(LOCAL_REVISION_KEY, String(cloudRevision));
     window.DelWinCloud.backupChoices = null;
-    status("Previous device backup recovered and synced to your account.");
+    window.closeModal?.();
+    status("Backup recovered. Reloading the game with the selected career…");
+    location.reload();
   } catch (error) {
-    status("The recovered backup is active on this device, but cloud sync did not complete: " + error.message + ". Your previous cloud save was not overwritten.", true);
+    if (currentUser?.uid === uid) {
+      syncReady = true;
+      if (local && !local.invalid) queueSave(local.payload, {checkpointType:"recovery-aborted"});
+      status("Backup recovery stopped: " + error.message + ". The selected backup remains available and the existing cloud career was not overwritten.", true);
+    }
   }
 }
+
 function isStarterCareer(payload) {
   if (!payload || typeof payload !== "object") return false;
   const toolLevels = payload.tools && typeof payload.tools === "object"
