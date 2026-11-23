@@ -69,14 +69,65 @@ test('cloud queue is scoped to the authenticated owner and cannot cross accounts
   assert.match(cloudSource, /pendingBelongsToUser\(pendingPayload, currentUser\)/);
 });
 
-test('account sign-in never replaces a different established local career', () => {
-  const start = cloudSource.indexOf('if (local?.ownerUid && local.ownerUid !== user.uid)');
-  const end = cloudSource.indexOf('const cloud = snap.exists()', start);
-  assert.ok(start >= 0 && end > start);
-  const guard = cloudSource.slice(start, end);
-  assert.match(guard, /showConflict\(local.raw, cloudData, local.ownerUid\)/);
-  assert.match(guard, /return;/);
-  assert.doesNotMatch(guard, /restoreCloudCareer|localStorage\.setItem\(LOCAL_KEY|location\.reload/);
+test('switching accounts archives the outgoing career and activates only the incoming account career', () => {
+  const start = cloudSource.indexOf('function accountStorageKey(uid, suffix)');
+  const end = cloudSource.indexOf('async function reconcile(user)', start);
+  assert.ok(start >= 0 && end > start, 'Missing account-isolated local save switch');
+  const block = cloudSource.slice(start, end);
+  const storage = new Map([
+    ['delwin_v4_save', JSON.stringify({ cash: 111, jobsCompleted: 4 })],
+    ['delwin_cloud_owner_uid', 'account-A'],
+    ['delwin_cloud_revision', '4'],
+    ['delwin_cloud_synced_snapshot', JSON.stringify({ cash: 100 })],
+    ['delwin_cloud_pending_outbox_v1', JSON.stringify({ uid: 'account-A', payload: { cash: 111 } })],
+    ['delwin_account_account-B_career', JSON.stringify({ cash: 900, jobsCompleted: 20 })],
+    ['delwin_account_account-B_revision', '8'],
+    ['delwin_account_account-B_baseline', JSON.stringify({ cash: 850 })],
+    ['delwin_account_account-B_outbox', JSON.stringify({ uid: 'account-B', payload: { cash: 900 } })]
+  ]);
+  const localStorage = {
+    getItem: key => storage.has(key) ? storage.get(key) : null,
+    setItem: (key, value) => storage.set(key, String(value)),
+    removeItem: key => storage.delete(key)
+  };
+  let reloads = 0;
+  const makeLocalSnapshot = () => {
+    const raw = localStorage.getItem('delwin_v4_save');
+    if (!raw) return null;
+    return { raw, payload: JSON.parse(raw), ownerUid: localStorage.getItem('delwin_cloud_owner_uid') };
+  };
+  const readOutbox = () => {
+    try { return JSON.parse(localStorage.getItem('delwin_cloud_pending_outbox_v1') || 'null'); }
+    catch { return null; }
+  };
+  const switchAccount = new Function(
+    'localStorage', 'localSnapshot', 'readDurableOutbox', 'status', 'location',
+    'backupLocal', 'LOCAL_KEY', 'OWNER_KEY', 'LOCAL_REVISION_KEY',
+    'SYNCED_SNAPSHOT_KEY', 'OUTBOX_KEY',
+    `${block}; return switchActiveAccountIfNeeded;`
+  )(
+    localStorage, makeLocalSnapshot, readOutbox, () => {},
+    { reload: () => { reloads += 1; } },
+    (raw, suffix) => localStorage.setItem(`backup_${suffix}`, raw),
+    'delwin_v4_save', 'delwin_cloud_owner_uid', 'delwin_cloud_revision',
+    'delwin_cloud_synced_snapshot', 'delwin_cloud_pending_outbox_v1'
+  );
+  assert.equal(switchAccount({ uid: 'account-B' }), true);
+  assert.equal(reloads, 1);
+  assert.equal(localStorage.getItem('delwin_account_account-A_career'), JSON.stringify({ cash: 111, jobsCompleted: 4 }));
+  assert.equal(localStorage.getItem('delwin_account_account-A_revision'), '4');
+  assert.equal(localStorage.getItem('delwin_account_account-A_baseline'), JSON.stringify({ cash: 100 }));
+  assert.equal(JSON.parse(localStorage.getItem('delwin_account_account-A_outbox')).uid, 'account-A');
+  assert.equal(localStorage.getItem('delwin_v4_save'), JSON.stringify({ cash: 900, jobsCompleted: 20 }));
+  assert.equal(localStorage.getItem('delwin_cloud_owner_uid'), 'account-B');
+  assert.equal(localStorage.getItem('delwin_cloud_revision'), '8');
+  assert.equal(localStorage.getItem('delwin_cloud_synced_snapshot'), JSON.stringify({ cash: 850 }));
+  assert.equal(JSON.parse(localStorage.getItem('delwin_cloud_pending_outbox_v1')).uid, 'account-B');
+});
+
+test('switching to an account without a local career clears only the active slot for cloud restore', () => {
+  assert.match(cloudSource, /localStorage\.removeItem\(LOCAL_KEY\);[\s\S]*?localStorage\.removeItem\(OWNER_KEY\);[\s\S]*?status\("Switched accounts\. Loading this account's saved career…"/);
+  assert.match(cloudSource, /if \(!local && cloud\)[\s\S]*?localStorage\.setItem\(LOCAL_KEY, JSON\.stringify\(cloud\.payload\)\)/);
 });
 
 test('local gameplay saves remain independent from cloud connectivity', () => {
