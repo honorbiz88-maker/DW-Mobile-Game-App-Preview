@@ -88,10 +88,12 @@ test('local gameplay saves remain independent from cloud connectivity', () => {
 });
 
 test('durable outbox is persisted before network work and cleared only after matching acknowledgement', () => {
-  const persist = cloudSource.indexOf('persistDurableOutbox(ownerUid, payload, checkpointType)');
-  const pending = cloudSource.indexOf('pendingPayload = { uid: queuedUid');
-  const flush = cloudSource.indexOf('async function flushPendingSave');
-  assert.ok(persist >= 0 && pending > persist && flush > pending);
+  const queueStart = cloudSource.indexOf('function queueSave(');
+  const queueEnd = cloudSource.indexOf('function isRestorePending()', queueStart);
+  const queue = cloudSource.slice(queueStart, queueEnd);
+  const persist = queue.indexOf('persistDurableOutbox(ownerUid, payload, checkpointType)');
+  const pending = queue.indexOf('pendingPayload = { uid: queuedUid');
+  assert.ok(queueStart >= 0 && queueEnd > queueStart && persist >= 0 && pending > persist);
   assert.match(cloudSource, /clearDurableOutboxIfMatches\(expectedUid, next\)/);
   assert.match(cloudSource, /queued\?\.uid === uid && sameValue\(queued.payload, payload\)/);
 });
