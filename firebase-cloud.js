@@ -355,6 +355,7 @@ async function keepLocal() {
     await writeCloud(JSON.parse(pending.localRaw), pending.uid, cloudRevision);
     if (!currentUser || currentUser.uid !== pending.uid) return;
     localStorage.setItem(OWNER_KEY, pending.uid);
+    localStorage.setItem(LOCAL_REVISION_KEY, String(cloudRevision));
     syncReady = true;
     window.DelWinCloud.pendingConflict = null;
     window.closeModal?.();
