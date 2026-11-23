@@ -183,66 +183,45 @@ async function reconcile(user) {
   reconcilingUids.add(user.uid);
   syncReady = false;
   busy = true;
-  status("Checking for an existing cloud career…");
+  status("Connecting cloud backup…");
   try {
     const ref = doc(db, "users", user.uid, "saves", "current");
     const snap = await getDoc(ref);
-    // Authentication may have changed while Firestore was responding. A stale
-    // reconciliation must never restore one account's save over another's local career.
+    // Ignore stale responses if the player changed accounts during the request.
     if (!currentUser || currentUser.uid !== user.uid) return;
     const local = localSnapshot();
     if (local?.invalid) return;
-    // A player may explicitly choose this account's cloud career in the conflict
-    // dialog. Honor that durable choice before the ordinary cross-account owner
-    // guard; game boot/migration can briefly rewrite local save metadata on reload.
+
+    // Honor an explicit Restore Cloud choice. This is the only normal path
+    // allowed to replace a device save and reload the game.
     let restoreMarker = null;
     try { restoreMarker = JSON.parse(localStorage.getItem(RESTORE_MARKER_KEY) || "null"); } catch {}
     if (restoreMarker?.uid === user.uid) {
-      // Restore the exact cloud snapshot the player selected. Do not silently
-      // switch to a newer Firestore revision during the reload handshake.
       const selectedPayload = restoreMarker.cloudPayload && typeof restoreMarker.cloudPayload === "object" && !Array.isArray(restoreMarker.cloudPayload)
         ? restoreMarker.cloudPayload
         : (snap.exists() ? snap.data()?.payload : null);
-      if (selectedPayload && typeof selectedPayload === "object" && !Array.isArray(selectedPayload)) {
-        const cloudPayload = JSON.stringify(selectedPayload);
-        const localMatchesCloud = !!local && JSON.stringify(local.payload) === cloudPayload;
-        localStorage.setItem(OWNER_KEY, user.uid);
-        if (!localMatchesCloud) {
-          // The explicit Restore choice makes the cloud copy authoritative.
-          // Preserve any startup-normalized/device version as a backup, but
-          // never queue it over the selected cloud career.
-          if (local) backupLocal(local.raw, "restore-reconciliation");
-          localStorage.setItem(LOCAL_KEY, cloudPayload);
-          // Keep the marker across this reload so game boot cannot write its
-          // normalized state before Firebase confirms the restored cloud copy.
-          syncReady = false;
-          status("Cloud career restored. Your previous device career remains backed up.");
-          location.reload();
-        } else {
-          localStorage.removeItem(RESTORE_MARKER_KEY);
-          syncReady = true;
-          status("Cloud career restored and connected.");
-        }
+      if (!selectedPayload || typeof selectedPayload !== "object" || Array.isArray(selectedPayload)) {
+        status("The selected cloud career is unavailable. Your device career has not been changed.", true);
         return;
       }
-    }
-    // Once this device is linked to the signed-in account, the cloud career is
-    // authoritative on launch. Treat local storage as a cache, not a second
-    // competing career; preserve any divergent device copy as a recoverable backup.
-    if (local?.ownerUid === user.uid && snap.exists()) {
-      const cloudData = snap.data();
-      if (cloudData?.schemaVersion === SCHEMA_VERSION && cloudData.payload && typeof cloudData.payload === "object" && !Array.isArray(cloudData.payload)) {
-        if (JSON.stringify(local.payload) !== JSON.stringify(cloudData.payload)) {
-          backupLocal(local.raw, "before-cloud-refresh");
-          localStorage.setItem(LOCAL_KEY, JSON.stringify(cloudData.payload));
-          localStorage.setItem(OWNER_KEY, user.uid);
-          syncReady = false;
-          status("Cloud career restored. Your previous device copy is backed up.");
-          location.reload();
-          return;
-        }
+      const cloudPayload = JSON.stringify(selectedPayload);
+      const localMatchesCloud = !!local && JSON.stringify(local.payload) === cloudPayload;
+      localStorage.setItem(OWNER_KEY, user.uid);
+      if (!localMatchesCloud) {
+        if (local) backupLocal(local.raw, "restore-reconciliation");
+        localStorage.setItem(LOCAL_KEY, cloudPayload);
+        syncReady = false;
+        status("Cloud career restored. Your previous device career remains backed up.");
+        location.reload();
+      } else {
+        localStorage.removeItem(RESTORE_MARKER_KEY);
+        syncReady = true;
+        status("Cloud career restored and connected.");
       }
+      return;
     }
+
+    // Never allow one account to claim another account's device career.
     if (local?.ownerUid && local.ownerUid !== user.uid) {
       if (snap.exists()) {
         const cloudData = snap.data();
@@ -257,45 +236,57 @@ async function reconcile(user) {
       }
       return;
     }
-    if (!snap.exists()) {
-      if (local?.ownerUid && local.ownerUid !== user.uid) {
-        status("This device's career is linked to another account. Nothing was uploaded. Sign back into that account or restore it from a cloud backup.", true);
-        return;
-      }
-      if (local) {
-        await writeCloud(local.payload, user.uid);
-        if (!currentUser || currentUser.uid !== user.uid) return;
-        localStorage.setItem(OWNER_KEY, user.uid);
-        status("Your existing device career is backed up to your account.");
-      } else {
-        localStorage.setItem(OWNER_KEY, user.uid);
-        status("Account connected. Your career will sync after your first save.");
-      }
-      syncReady = true;
-      return;
-    }
-    const cloud = snap.data();
-    if (!cloud || cloud.schemaVersion !== SCHEMA_VERSION || !cloud.payload || typeof cloud.payload !== "object" || Array.isArray(cloud.payload)) {
+
+    const cloud = snap.exists() ? snap.data() : null;
+    if (cloud && (cloud.schemaVersion !== SCHEMA_VERSION || !cloud.payload || typeof cloud.payload !== "object" || Array.isArray(cloud.payload))) {
       status("The cloud save format is not recognized. Nothing was overwritten; ask for help before proceeding.", true);
       return;
     }
-    const cloudRevision = cloud.updatedAt?.toMillis ? cloud.updatedAt.toMillis() : null;
-    if (!local) {
+
+    // A device that already belongs to this account keeps playing its local
+    // career. Do not compare full saves, replace local data, or reload on startup.
+    // Each gameplay save is written locally first and queued for background backup.
+    if (local?.ownerUid === user.uid) {
+      syncReady = true;
+      status("Cloud backup connected · this device is ready.");
+      return;
+    }
+
+    // Account creation on a device with an existing guest career: link and back
+    // up that career when this account has no cloud save yet.
+    if (local && !cloud) {
+      await writeCloud(local.payload, user.uid);
+      if (!currentUser || currentUser.uid !== user.uid) return;
+      localStorage.setItem(OWNER_KEY, user.uid);
+      syncReady = true;
+      status("Your existing device career is now backed up to your account.");
+      return;
+    }
+
+    // An unlinked guest career and an existing account career are two distinct
+    // saves. Preserve both and ask only at this account-link boundary.
+    if (local && cloud) {
+      showConflict(local.raw, cloud);
+      status("A device career and an account career both exist. Neither has been changed.", true);
+      return;
+    }
+
+    // A genuinely new device has no local career, so restore the account save
+    // once. The reload is only to initialize the game's in-memory state.
+    if (!local && cloud) {
       localStorage.setItem(LOCAL_KEY, JSON.stringify(cloud.payload));
       localStorage.setItem(OWNER_KEY, user.uid);
       status("Cloud career restored to this device.");
       location.reload();
       return;
     }
-    if (JSON.stringify(local.payload) === JSON.stringify(cloud.payload)) {
-      localStorage.setItem(OWNER_KEY, user.uid);
-      syncReady = true;
-      status("Account connected · local and cloud careers match.");
-      return;
-    }
-    showConflict(local.raw, cloud);
+
+    // Brand-new account and device: establish ownership before allowing sync.
+    localStorage.setItem(OWNER_KEY, user.uid);
+    syncReady = true;
+    status("Account connected. Your career will sync after your first save.");
   } catch (error) {
-    status(`Cloud check failed: ${error.message}. Your local career remains available.`, true);
+    status(`Cloud connection failed: ${error.message}. Your local career remains available.`, true);
   } finally {
     if (currentUser?.uid === user.uid) busy = false;
     reconcilingUids.delete(user.uid);
@@ -352,7 +343,7 @@ function pendingBelongsToUser(pending, user) {
 }
 async function flushPendingSave(expectedUid) {
   if (writing) return;
-  if (!pendingBelongsToUser(pendingPayload, currentUser) || currentUser.uid !== expectedUid || !syncReady) return;
+  if (!pendingBelongsToUser(pendingPayload, currentUser) || currentUser.uid !== expectedUid || !syncReady || !navigator.onLine) return;
   if (busy) {
     syncTimer = setTimeout(() => flushPendingSave(expectedUid), 1400);
     return;
@@ -383,7 +374,7 @@ async function flushPendingSave(expectedUid) {
     }
   } finally {
     writing = false;
-    if (currentUser && syncReady && pendingBelongsToUser(pendingPayload, currentUser)) {
+    if (currentUser && syncReady && navigator.onLine && pendingBelongsToUser(pendingPayload, currentUser)) {
       clearTimeout(syncTimer);
       const nextUid = currentUser.uid;
       syncTimer = setTimeout(() => flushPendingSave(nextUid), retryDelay);
@@ -391,7 +382,7 @@ async function flushPendingSave(expectedUid) {
   }
 }
 function queueSave(payload) {
-  if (!currentUser || !syncReady || !navigator.onLine) return;
+  if (!currentUser || !syncReady) return;
   let restoreMarker = null;
   try { restoreMarker = JSON.parse(localStorage.getItem(RESTORE_MARKER_KEY) || "null"); } catch {}
   if (restoreMarker?.uid === currentUser.uid) {
