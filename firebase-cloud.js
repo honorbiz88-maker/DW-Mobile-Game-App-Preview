@@ -507,7 +507,6 @@ function switchActiveAccountIfNeeded(user) {
       const parsedIncoming = JSON.parse(incomingCareer);
       if (!parsedIncoming || typeof parsedIncoming !== "object" || Array.isArray(parsedIncoming)) throw new Error("Invalid saved career for this account");
     }
-    if (raw) backupLocal(raw, "account-switch-" + ownerUid);
     if (incomingCareer) {
       localStorage.setItem(LOCAL_KEY, incomingCareer);
       localStorage.setItem(OWNER_KEY, user.uid);
@@ -579,10 +578,9 @@ async function reconcile(user) {
       return;
     }
 
-    // A career already linked to another account is never replaced during
-    // sign-in. Authentication identifies the cloud account; it does not grant
-    // permission to swap the active local career. Use a separate clean device
-    // for a different account, or return to the account that owns this career.
+    // Defensive fallback: account switching should already have selected the
+    // correct account-local career before reconciliation reaches this point.
+    // Never upload or apply a save whose owner still differs from this user.
     if (local?.ownerUid && local.ownerUid !== user.uid) {
       if (snap.exists()) {
         const cloudData = snap.data();
