@@ -57,6 +57,14 @@ let busy = false;
 let writing = false;
 const reconcilingUids = new Set();
 
+function setSyncState(state, detail = "") {
+  const el = document.getElementById("cloud-sync-indicator");
+  if (!el) return;
+  const labels = { local: "SAVED LOCALLY", syncing: "SYNCING TO CLOUD", synced: "CLOUD SYNCED", pending: "OFFLINE — SYNC PENDING", checking: "CHECKING CLOUD BACKUP", conflict: "SYNC PAUSED — REVIEW NEEDED", guest: "DEVICE SAVE ACTIVE" };
+  el.textContent = detail ? labels[state] + " · " + detail : (labels[state] || state);
+  el.dataset.syncState = state;
+  el.style.color = state === "synced" ? "#86efac" : state === "conflict" ? "#fca5a5" : "var(--muted)";
+}
 function status(message, error = false) {
   const el = document.getElementById("cloud-account-status");
   if (el) {
@@ -624,6 +632,7 @@ async function reconcile(user) {
         localStorage.setItem(LOCAL_REVISION_KEY, String(cloudRevisionOnServer));
         localStorage.setItem(SYNCED_SNAPSHOT_KEY, JSON.stringify(cloud.payload));
         syncReady = true;
+        setSyncState("synced");
         status("Cloud backup connected · this device is ready.");
         return;
       }
@@ -772,6 +781,7 @@ async function flushPendingSave(expectedUid) {
     return;
   }
   writing = true;
+  setSyncState("syncing");
   const next = pendingPayload.payload;
   const checkpoint = pendingPayload.checkpoint || {};
   pendingPayload = null;
@@ -784,6 +794,7 @@ async function flushPendingSave(expectedUid) {
       try { restoreMarker = JSON.parse(localStorage.getItem(RESTORE_MARKER_KEY) || "null"); } catch {}
       if (restoreMarker?.uid === expectedUid) localStorage.removeItem(RESTORE_MARKER_KEY);
       clearDurableOutboxIfMatches(expectedUid, next);
+      setSyncState("synced");
       status("Cloud save synced.");
     }
   } catch (error) {
@@ -839,7 +850,8 @@ function queueSave(payload, metadata = {}) {
   const checkpointType = metadata.checkpointType || "gameplay";
   // Persist the upload intent before starting any network work. A reload or
   // offline period must not erase the fact that this local save needs backup.
-  persistDurableOutbox(ownerUid, payload, checkpointType);
+  const queued = persistDurableOutbox(ownerUid, payload, checkpointType);
+  if (queued) setSyncState(!navigator.onLine ? "pending" : "local");
   if (!currentUser || !syncReady || currentUser.uid !== ownerUid) return;
   let restoreMarker = null;
   try { restoreMarker = JSON.parse(localStorage.getItem(RESTORE_MARKER_KEY) || "null"); } catch {}
@@ -875,7 +887,9 @@ window.DelWinCloud = {
   },
   pendingConflict: null
 };
+window.addEventListener("offline", () => { if (currentUser) setSyncState("pending"); });
 window.addEventListener("online", () => {
+  if (currentUser) setSyncState("local", "connection restored; checking backup");
   if (!currentUser || !navigator.onLine) return;
   // Retry only an authentication setup that previously failed. Healthy
   // sessions never re-read Firestore or re-run save selection on reconnect.
@@ -914,6 +928,6 @@ onAuthStateChanged(auth, user => {
     if (signedIn) signedIn.hidden = !user;
     const email = document.getElementById("cloud-user-email");
     if (email) email.textContent = user ? `Signed in as ${user.email || "player"}` : "";
-    if (user) reconcile(user);
-    else status("Sign in to back up your career across devices.");
+    if (user) { setSyncState("checking"); reconcile(user); }
+    else { setSyncState("guest"); status("Sign in to back up your career across devices."); }
 });
