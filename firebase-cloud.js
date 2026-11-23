@@ -247,8 +247,16 @@ async function reconcile(user) {
     // career. Do not compare full saves, replace local data, or reload on startup.
     // Each gameplay save is written locally first and queued for background backup.
     if (local?.ownerUid === user.uid) {
+      if (!cloud) {
+        // Recover a missing cloud document from the already-linked local career.
+        // This is a one-time background seed, never a save-selection prompt.
+        await writeCloud(local.payload, user.uid);
+        if (!currentUser || currentUser.uid !== user.uid) return;
+        status("Cloud backup reconnected from this device's saved career.");
+      } else {
+        status("Cloud backup connected · this device is ready.");
+      }
       syncReady = true;
-      status("Cloud backup connected · this device is ready.");
       return;
     }
 
