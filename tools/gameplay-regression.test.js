@@ -59,14 +59,14 @@ function gameFunction(name, dependencies = {}) {
 }
 
 test('cloud queue is scoped to the authenticated owner and cannot cross accounts', () => {
-  const match = cloudSource.match(/function pendingBelongsToUser\\(pending, user\\) \\{[\\s\\S]*?\\n\\}/);
+  const match = cloudSource.match(/function pendingBelongsToUser\(pending, user\) \{[\s\S]*?\n\}/);
   assert.ok(match, 'Missing account-scoped pending-save guard');
   const belongs = new Function(`return (${match[0]});`)();
   assert.equal(belongs({ uid: 'account-A', payload: { cash: 10 } }, { uid: 'account-A' }), true);
   assert.equal(belongs({ uid: 'account-A', payload: { cash: 10 } }, { uid: 'account-B' }), false);
   assert.equal(belongs({ uid: 'account-A' }, null), false);
-  assert.match(cloudSource, /currentUser\\.uid !== expectedUid/);
-  assert.match(cloudSource, /pendingBelongsToUser\\(pendingPayload, currentUser\\)/);
+  assert.match(cloudSource, /currentUser\.uid !== expectedUid/);
+  assert.match(cloudSource, /pendingBelongsToUser\(pendingPayload, currentUser\)/);
 });
 
 test('account sign-in never replaces a different established local career', () => {
@@ -74,15 +74,15 @@ test('account sign-in never replaces a different established local career', () =
   const end = cloudSource.indexOf('const cloud = snap.exists()', start);
   assert.ok(start >= 0 && end > start);
   const guard = cloudSource.slice(start, end);
-  assert.match(guard, /showConflict\\(local.raw, cloudData, local.ownerUid\\)/);
+  assert.match(guard, /showConflict\(local.raw, cloudData, local.ownerUid\)/);
   assert.match(guard, /return;/);
-  assert.doesNotMatch(guard, /restoreCloudCareer|localStorage\\.setItem\\(LOCAL_KEY|location\\.reload/);
+  assert.doesNotMatch(guard, /restoreCloudCareer|localStorage\.setItem\(LOCAL_KEY|location\.reload/);
 });
 
 test('local gameplay saves remain independent from cloud connectivity', () => {
   const save = extractFunction('saveState');
-  assert.match(save, /localStorage\\.setItem\\('delwin_v4_save', JSON\\.stringify\\(state\\)\\)/);
-  assert.match(save, /DelWinCloud\\?\\.queueSave/);
+  assert.match(save, /localStorage\.setItem\('delwin_v4_save', JSON\.stringify\(state\)\)/);
+  assert.match(save, /DelWinCloud\?\.queueSave/);
   assert.match(save, /reportLocalSaveError/);
   assert.doesNotMatch(save, /await |getDoc|runTransaction/);
 });
@@ -92,22 +92,22 @@ test('durable outbox is persisted before network work and cleared only after mat
   const pending = cloudSource.indexOf('pendingPayload = { uid: queuedUid');
   const flush = cloudSource.indexOf('async function flushPendingSave');
   assert.ok(persist >= 0 && pending > persist && flush > pending);
-  assert.match(cloudSource, /clearDurableOutboxIfMatches\\(expectedUid, next\\)/);
-  assert.match(cloudSource, /queued\\?\\.uid === uid && sameValue\\(queued.payload, payload\\)/);
+  assert.match(cloudSource, /clearDurableOutboxIfMatches\(expectedUid, next\)/);
+  assert.match(cloudSource, /queued\?\.uid === uid && sameValue\(queued.payload, payload\)/);
 });
 
 test('only a device without an established local career restores an account cloud save', () => {
   const start = cloudSource.indexOf('if (!local && cloud)');
   const end = cloudSource.indexOf('// Brand-new account and device', start);
   assert.ok(start >= 0 && end > start);
-  assert.match(cloudSource.slice(start, end), /localStorage\\.setItem\\(LOCAL_KEY, JSON\\.stringify\\(cloud.payload\\)\\)/);
-  assert.match(cloudSource.slice(start, end), /location\\.reload\\(\\)/);
+  assert.match(cloudSource.slice(start, end), /localStorage\.setItem\(LOCAL_KEY, JSON\.stringify\(cloud.payload\)\)/);
+  assert.match(cloudSource.slice(start, end), /location\.reload\(\)/);
 });
 
 test('cloud writes use revision compare-and-set and retain failed snapshots for retry', () => {
-  assert.match(cloudSource, /async function writeCloud\\(payload, expectedUid = currentUser\\?\\.uid/);
+  assert.match(cloudSource, /async function writeCloud\(payload, expectedUid = currentUser\?\.uid/);
   assert.match(cloudSource, /actualRevision !== expectedRevision/);
-  assert.match(cloudSource, /save\\/revision-conflict/);
+  assert.match(cloudSource, /save\/revision-conflict/);
   assert.match(cloudSource, /retryDelay = 5000/);
   assert.match(cloudSource, /retrying automatically/);
 });
