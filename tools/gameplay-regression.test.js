@@ -105,14 +105,15 @@ test('switching accounts archives the outgoing career and activates only the inc
   const switchAccount = new Function(
     'localStorage', 'localSnapshot', 'readDurableOutbox', 'status', 'location',
     'backupLocal', 'LOCAL_KEY', 'OWNER_KEY', 'LOCAL_REVISION_KEY',
-    'SYNCED_SNAPSHOT_KEY', 'OUTBOX_KEY',
+    'SYNCED_SNAPSHOT_KEY', 'OUTBOX_KEY', 'RESTORE_MARKER_KEY',
     `${block}; return switchActiveAccountIfNeeded;`
   )(
     localStorage, makeLocalSnapshot, readOutbox, () => {},
     { reload: () => { reloads += 1; } },
     (raw, suffix) => localStorage.setItem(`backup_${suffix}`, raw),
     'delwin_v4_save', 'delwin_cloud_owner_uid', 'delwin_cloud_revision',
-    'delwin_cloud_synced_snapshot', 'delwin_cloud_pending_outbox_v1'
+    'delwin_cloud_synced_snapshot', 'delwin_cloud_pending_outbox_v1',
+    'delwin_cloud_restore_pending'
   );
   assert.equal(switchAccount({ uid: 'account-B' }), true);
   assert.equal(reloads, 1);
