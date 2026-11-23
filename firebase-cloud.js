@@ -4,7 +4,7 @@ import {
   signInWithEmailAndPassword, sendPasswordResetEmail, signOut
 } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-auth.js";
 import {
-  getFirestore, doc, getDoc, runTransaction, serverTimestamp
+  getFirestore, doc, getDoc, onSnapshot, runTransaction, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/13.4.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -29,6 +29,9 @@ let syncReady = false;
 let cloudRevision = 0;
 let reconciliationRetryPending = false;
 let syncTimer = null;
+let cloudWatchUnsubscribe = null;
+let cloudWatchUid = null;
+let lastObservedCloudRevision = -1;
 let pendingPayload = null;
 let busy = false;
 let writing = false;
@@ -201,6 +204,38 @@ async function writeCloud(payload, expectedUid = currentUser?.uid, expectedRevis
   }
   return nextRevision;
 }
+function watchCloud(user) {
+  if (cloudWatchUid === user.uid && cloudWatchUnsubscribe) return;
+  cloudWatchUnsubscribe?.();
+  cloudWatchUnsubscribe = null;
+  cloudWatchUid = user.uid;
+  lastObservedCloudRevision = -1;
+  const ref = doc(db, "users", user.uid, "saves", "current");
+  cloudWatchUnsubscribe = onSnapshot(ref, snap => {
+    if (!currentUser || currentUser.uid !== user.uid || !syncReady || !snap.exists()) return;
+    const cloud = snap.data();
+    if (cloud?.schemaVersion !== SCHEMA_VERSION || !cloud.payload || typeof cloud.payload !== "object" || Array.isArray(cloud.payload)) return;
+    const revision = Number.isSafeInteger(cloud.revision) ? cloud.revision : 0;
+    if (revision <= lastObservedCloudRevision) return;
+    lastObservedCloudRevision = revision;
+    const local = localSnapshot();
+    if (!local || local.invalid) return;
+    const localRevision = Number.parseInt(localStorage.getItem(LOCAL_REVISION_KEY) || "0", 10) || 0;
+    if (revision > localRevision && JSON.stringify(local.payload) !== JSON.stringify(cloud.payload)) {
+      syncReady = false;
+      pendingPayload = null;
+      cloudRevision = revision;
+      showConflict(local.raw, cloud, local.ownerUid);
+      status("A newer career was saved on another device. Choose which copy to keep; neither has been changed.", true);
+    } else if (JSON.stringify(local.payload) === JSON.stringify(cloud.payload)) {
+      localStorage.setItem(LOCAL_REVISION_KEY, String(revision));
+      cloudRevision = revision;
+    }
+  }, error => {
+    if (currentUser?.uid === user.uid) status("Live cloud updates paused. Your local career remains safe.", true);
+  });
+}
+
 async function reconcile(user) {
   if (reconcilingUids.has(user.uid)) return;
   reconcilingUids.add(user.uid);
@@ -337,7 +372,10 @@ async function reconcile(user) {
     if (currentUser?.uid === user.uid) reconciliationRetryPending = true;
     status(`Cloud connection failed: ${error.message}. Your local career remains available.`, true);
   } finally {
-    if (currentUser?.uid === user.uid) busy = false;
+    if (currentUser?.uid === user.uid) {
+      busy = false;
+      if (syncReady) watchCloud(user);
+    }
     reconcilingUids.delete(user.uid);
   }
 }
@@ -495,6 +533,10 @@ onAuthStateChanged(auth, user => {
     const previousUid = currentUser?.uid || null;
     const nextUid = user?.uid || null;
     if (previousUid !== nextUid) {
+      cloudWatchUnsubscribe?.();
+      cloudWatchUnsubscribe = null;
+      cloudWatchUid = null;
+      lastObservedCloudRevision = -1;
       clearTimeout(syncTimer);
       syncTimer = null;
       pendingPayload = null;
